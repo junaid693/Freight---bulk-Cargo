@@ -2,25 +2,44 @@
 
 Run locally:
     cd backend
+    python -m data.update_data          # populate the database once
     uvicorn main:app --reload --port 8000
 
 Interactive docs are available at http://localhost:8000/docs
 """
 
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from predict import get_model, predict_freight
-from schemas import FreightRequest, FreightResponse
+# Make the backend root importable so `from data...` and `from services...`
+# work regardless of the current working directory.
+_BACKEND_ROOT = Path(__file__).resolve().parent
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+from data import database
+from predict import get_model
+from schemas import (
+    DataStatus,
+    FreightRequest,
+    FreightResponse,
+    LatestData,
+    MarketQuoteOut,
+    WeatherSnapshot,
+)
+from services.forecast_service import forecast, init_data_layer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Eagerly load the model on startup so failures surface immediately
-    # and the first /predict request is fast.
+    # Eagerly load the model + initialise the database on startup so failures
+    # surface immediately and the first request is fast.
     get_model()
+    init_data_layer()
     yield
 
 
@@ -29,9 +48,10 @@ app = FastAPI(
     description=(
         "Forecast next-month bulk-cargo freight rates (USD/tonne) using the "
         "existing trained RandomForest model, with weather-risk based "
-        "chartering recommendations."
+        "chartering recommendations. Weather data is fetched from Open-Meteo "
+        "and cached in SQLite; market/freight sources are pluggable."
     ),
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -51,17 +71,69 @@ app.add_middleware(
 )
 
 
+# --------------------------------------------------------------------------- #
+# Health & data
+# --------------------------------------------------------------------------- #
 @app.get("/health")
 def health():
     """Health check used by load balancers / uptime monitors."""
     return {"status": "ok"}
 
 
+@app.get("/data/status", response_model=DataStatus)
+def data_status():
+    """Report when each data category was last updated."""
+    return database.get_data_status()
+
+
+@app.get("/data/latest", response_model=LatestData)
+def data_latest():
+    """Return the latest stored weather, market and freight data."""
+    weather = database.get_all_latest_weather()
+    market_map = database.get_latest_market()
+    market = [
+        MarketQuoteOut(
+            series=series,
+            value=q["value"],
+            unit=q["unit"],
+            source=q["source"],
+            fetched_at=q["fetched_at"],
+        )
+        for series, q in market_map.items()
+    ]
+    # Freight: report overall count + the single most recent observation.
+    with database.get_connection() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) AS c FROM freight_observations"
+        ).fetchone()["c"]
+        latest = conn.execute(
+            "SELECT * FROM freight_observations ORDER BY observed_at DESC LIMIT 1"
+        ).fetchone()
+    return LatestData(
+        weather=[WeatherSnapshot(**w) for w in weather],
+        market=market,
+        freight_observations_count=count,
+        latest_freight_observation=dict(latest) if latest else None,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Prediction
+# --------------------------------------------------------------------------- #
 @app.post("/predict", response_model=FreightResponse)
 def predict(req: FreightRequest):
-    """Forecast next-month freight rate and return a chartering recommendation."""
+    """Forecast next-month freight rate and return a chartering recommendation.
+
+    Identity fields (origin, destination, commodity, vessel_type, cargo_tonnes)
+    are required. Every other field is optional and will be filled from the
+    SQLite database (latest weather for the origin port, latest market quotes,
+    latest freight observation for the route) when omitted.
+    """
     try:
-        return predict_freight(req.model_dump())
+        return forecast(req.model_dump(exclude_unset=False))
+    except ValueError as exc:
+        # Missing inputs that could not be filled from the DB.
+        raise HTTPException(status_code=422, detail=str(exc))
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=f"Model unavailable: {exc}")
     except Exception as exc:  # pragma: no cover - defensive
