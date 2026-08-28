@@ -1,0 +1,1271 @@
+{
+  "global_stats": {
+    "bdi": {
+      "mean": 1689.5454545454545,
+      "median": 1710.0,
+      "std": 264.02803007866925,
+      "min": 1310.0,
+      "max": 2150.0,
+      "count": 110
+    },
+    "vlsfo_usd_per_tonne": {
+      "mean": 629.3636363636364,
+      "median": 636.5,
+      "std": 22.30428735382434,
+      "min": 588.0,
+      "max": 660.0,
+      "count": 110
+    },
+    "coal_price_usd_per_mt": {
+      "mean": 122.81363636363638,
+      "median": 121.4,
+      "std": 15.607904826643601,
+      "min": 98.6,
+      "max": 146.6,
+      "count": 110
+    },
+    "iron_ore_price_usd_per_dmt": {
+      "mean": 103.39545454545454,
+      "median": 101.80000000000001,
+      "std": 7.604469790897144,
+      "min": 92.3,
+      "max": 124.4,
+      "count": 110
+    },
+    "wind_kmh": {
+      "mean": 35.69140727272727,
+      "median": 32.410000000000004,
+      "std": 10.184351194782229,
+      "min": 19.446,
+      "max": 57.412000000000006,
+      "count": 110
+    },
+    "wave_height_m": {
+      "mean": 2.443636363636364,
+      "median": 2.2,
+      "std": 0.8849949227789126,
+      "min": 1.1,
+      "max": 4.3,
+      "count": 110
+    },
+    "cyclone_risk": {
+      "mean": 2.772727272727273,
+      "median": 2.0,
+      "std": 1.2089808499639891,
+      "min": 1.0,
+      "max": 5.0,
+      "count": 110
+    },
+    "weather_delay_days": {
+      "mean": 2.0,
+      "median": 2.25,
+      "std": 1.3202724211521824,
+      "min": 0.0,
+      "max": 4.0,
+      "count": 110
+    },
+    "current_freight_usd_per_tonne": {
+      "mean": 13.232727272727272,
+      "median": 12.55,
+      "std": 3.1533907508727395,
+      "min": 8.5,
+      "max": 21.2,
+      "count": 110
+    },
+    "freight_pct_change": {
+      "mean": 4.6223361099741975,
+      "std": 31.2841289668617,
+      "min": -41.379310344827594,
+      "max": 94.31818181818181
+    }
+  },
+  "per_combination_stats": {
+    "Australia West Coast|East Coast India|Iron Ore|Capesize": {
+      "n_rows": 22,
+      "date_range": [
+        "2024-02-01",
+        "2025-11-01"
+      ],
+      "features": {
+        "bdi": {
+          "mean": 1689.5454545454545,
+          "median": 1710.0,
+          "std": 269.0101303230981,
+          "min": 1310.0,
+          "max": 2150.0,
+          "count": 22
+        },
+        "vlsfo_usd_per_tonne": {
+          "mean": 629.3636363636364,
+          "median": 636.5,
+          "std": 22.725160074967576,
+          "min": 588.0,
+          "max": 660.0,
+          "count": 22
+        },
+        "coal_price_usd_per_mt": {
+          "mean": 122.81363636363636,
+          "median": 121.4,
+          "std": 15.902419565963793,
+          "min": 98.6,
+          "max": 146.6,
+          "count": 22
+        },
+        "iron_ore_price_usd_per_dmt": {
+          "mean": 103.39545454545454,
+          "median": 101.80000000000001,
+          "std": 7.747963005586099,
+          "min": 92.3,
+          "max": 124.4,
+          "count": 22
+        },
+        "wind_kmh": {
+          "mean": 38.12594545454545,
+          "median": 34.076800000000006,
+          "std": 10.750156459225861,
+          "min": 25.557600000000004,
+          "max": 57.412000000000006,
+          "count": 22
+        },
+        "wave_height_m": {
+          "mean": 2.6272727272727274,
+          "median": 2.3499999999999996,
+          "std": 0.9477702244048386,
+          "min": 1.5,
+          "max": 4.3,
+          "count": 22
+        },
+        "cyclone_risk": {
+          "mean": 2.772727272727273,
+          "median": 2.0,
+          "std": 1.2317938209440804,
+          "min": 1.0,
+          "max": 5.0,
+          "count": 22
+        },
+        "weather_delay_days": {
+          "mean": 2.0,
+          "median": 2.25,
+          "std": 1.3451854182690985,
+          "min": 0.0,
+          "max": 4.0,
+          "count": 22
+        },
+        "current_freight_usd_per_tonne": {
+          "mean": 11.10909090909091,
+          "median": 11.05,
+          "std": 1.6552683830465134,
+          "min": 8.8,
+          "max": 13.8,
+          "count": 22
+        }
+      },
+      "freight_pct_change": {
+        "mean": 2.449464535789506,
+        "std": 15.734510201245419,
+        "min": -25.0,
+        "max": 43.956043956043956
+      }
+    },
+    "Hay Point|East Coast India|Coal|Capesize": {
+      "n_rows": 22,
+      "date_range": [
+        "2024-02-01",
+        "2025-11-01"
+      ],
+      "features": {
+        "bdi": {
+          "mean": 1689.5454545454545,
+          "median": 1710.0,
+          "std": 269.0101303230981,
+          "min": 1310.0,
+          "max": 2150.0,
+          "count": 22
+        },
+        "vlsfo_usd_per_tonne": {
+          "mean": 629.3636363636364,
+          "median": 636.5,
+          "std": 22.725160074967576,
+          "min": 588.0,
+          "max": 660.0,
+          "count": 22
+        },
+        "coal_price_usd_per_mt": {
+          "mean": 122.81363636363636,
+          "median": 121.4,
+          "std": 15.902419565963793,
+          "min": 98.6,
+          "max": 146.6,
+          "count": 22
+        },
+        "iron_ore_price_usd_per_dmt": {
+          "mean": 103.39545454545454,
+          "median": 101.80000000000001,
+          "std": 7.747963005586099,
+          "min": 92.3,
+          "max": 124.4,
+          "count": 22
+        },
+        "wind_kmh": {
+          "mean": 36.223436363636374,
+          "median": 33.0582,
+          "std": 7.8214645338231135,
+          "min": 26.2984,
+          "max": 50.93,
+          "count": 22
+        },
+        "wave_height_m": {
+          "mean": 2.472727272727272,
+          "median": 2.25,
+          "std": 0.7179214827620464,
+          "min": 1.6,
+          "max": 3.8,
+          "count": 22
+        },
+        "cyclone_risk": {
+          "mean": 2.772727272727273,
+          "median": 2.0,
+          "std": 1.2317938209440804,
+          "min": 1.0,
+          "max": 5.0,
+          "count": 22
+        },
+        "weather_delay_days": {
+          "mean": 2.0,
+          "median": 2.25,
+          "std": 1.3451854182690985,
+          "min": 0.0,
+          "max": 4.0,
+          "count": 22
+        },
+        "current_freight_usd_per_tonne": {
+          "mean": 14.799999999999999,
+          "median": 14.7,
+          "std": 2.0009521543029267,
+          "min": 11.8,
+          "max": 17.9,
+          "count": 22
+        }
+      },
+      "freight_pct_change": {
+        "mean": 1.9764798476485932,
+        "std": 14.412824080896122,
+        "min": -25.609756097560975,
+        "max": 41.322314049586794
+      }
+    },
+    "Hay Point|East Coast India|Coal|Panamax": {
+      "n_rows": 22,
+      "date_range": [
+        "2024-02-01",
+        "2025-11-01"
+      ],
+      "features": {
+        "bdi": {
+          "mean": 1689.5454545454545,
+          "median": 1710.0,
+          "std": 269.0101303230981,
+          "min": 1310.0,
+          "max": 2150.0,
+          "count": 22
+        },
+        "vlsfo_usd_per_tonne": {
+          "mean": 629.3636363636364,
+          "median": 636.5,
+          "std": 22.725160074967576,
+          "min": 588.0,
+          "max": 660.0,
+          "count": 22
+        },
+        "coal_price_usd_per_mt": {
+          "mean": 122.81363636363636,
+          "median": 121.4,
+          "std": 15.902419565963793,
+          "min": 98.6,
+          "max": 146.6,
+          "count": 22
+        },
+        "iron_ore_price_usd_per_dmt": {
+          "mean": 103.39545454545454,
+          "median": 101.80000000000001,
+          "std": 7.747963005586099,
+          "min": 92.3,
+          "max": 124.4,
+          "count": 22
+        },
+        "wind_kmh": {
+          "mean": 36.223436363636374,
+          "median": 33.0582,
+          "std": 7.8214645338231135,
+          "min": 26.2984,
+          "max": 50.93,
+          "count": 22
+        },
+        "wave_height_m": {
+          "mean": 2.472727272727272,
+          "median": 2.25,
+          "std": 0.7179214827620464,
+          "min": 1.6,
+          "max": 3.8,
+          "count": 22
+        },
+        "cyclone_risk": {
+          "mean": 2.772727272727273,
+          "median": 2.0,
+          "std": 1.2317938209440804,
+          "min": 1.0,
+          "max": 5.0,
+          "count": 22
+        },
+        "weather_delay_days": {
+          "mean": 2.0,
+          "median": 2.25,
+          "std": 1.3451854182690985,
+          "min": 0.0,
+          "max": 4.0,
+          "count": 22
+        },
+        "current_freight_usd_per_tonne": {
+          "mean": 17.604545454545455,
+          "median": 17.4,
+          "std": 2.1539503625901326,
+          "min": 14.5,
+          "max": 21.2,
+          "count": 22
+        }
+      },
+      "freight_pct_change": {
+        "mean": 1.6964416509355849,
+        "std": 12.967421189294258,
+        "min": -21.875,
+        "max": 37.16216216216217
+      }
+    },
+    "Taboneo|East Coast India|Thermal Coal|Panamax": {
+      "n_rows": 22,
+      "date_range": [
+        "2024-02-01",
+        "2025-11-01"
+      ],
+      "features": {
+        "bdi": {
+          "mean": 1689.5454545454545,
+          "median": 1710.0,
+          "std": 269.0101303230981,
+          "min": 1310.0,
+          "max": 2150.0,
+          "count": 22
+        },
+        "vlsfo_usd_per_tonne": {
+          "mean": 629.3636363636364,
+          "median": 636.5,
+          "std": 22.725160074967576,
+          "min": 588.0,
+          "max": 660.0,
+          "count": 22
+        },
+        "coal_price_usd_per_mt": {
+          "mean": 122.81363636363636,
+          "median": 121.4,
+          "std": 15.902419565963793,
+          "min": 98.6,
+          "max": 146.6,
+          "count": 22
+        },
+        "iron_ore_price_usd_per_dmt": {
+          "mean": 103.39545454545454,
+          "median": 101.80000000000001,
+          "std": 7.747963005586099,
+          "min": 92.3,
+          "max": 124.4,
+          "count": 22
+        },
+        "wind_kmh": {
+          "mean": 33.9421090909091,
+          "median": 30.7432,
+          "std": 11.983971556442702,
+          "min": 19.446,
+          "max": 55.189600000000006,
+          "count": 22
+        },
+        "wave_height_m": {
+          "mean": 2.3227272727272723,
+          "median": 2.1500000000000004,
+          "std": 1.0169664592408045,
+          "min": 1.1,
+          "max": 4.1,
+          "count": 22
+        },
+        "cyclone_risk": {
+          "mean": 2.772727272727273,
+          "median": 2.0,
+          "std": 1.2317938209440804,
+          "min": 1.0,
+          "max": 5.0,
+          "count": 22
+        },
+        "weather_delay_days": {
+          "mean": 2.0,
+          "median": 2.25,
+          "std": 1.3451854182690985,
+          "min": 0.0,
+          "max": 4.0,
+          "count": 22
+        },
+        "current_freight_usd_per_tonne": {
+          "mean": 10.45,
+          "median": 10.4,
+          "std": 1.2693267806953719,
+          "min": 8.5,
+          "max": 12.5,
+          "count": 22
+        }
+      },
+      "freight_pct_change": {
+        "mean": 1.491275249795814,
+        "std": 12.654212589498771,
+        "min": -22.413793103448278,
+        "max": 35.22727272727273
+      }
+    },
+    "Taboneo|East Coast India|Thermal Coal|Supramax": {
+      "n_rows": 22,
+      "date_range": [
+        "2024-02-01",
+        "2025-11-01"
+      ],
+      "features": {
+        "bdi": {
+          "mean": 1689.5454545454545,
+          "median": 1710.0,
+          "std": 269.0101303230981,
+          "min": 1310.0,
+          "max": 2150.0,
+          "count": 22
+        },
+        "vlsfo_usd_per_tonne": {
+          "mean": 629.3636363636364,
+          "median": 636.5,
+          "std": 22.725160074967576,
+          "min": 588.0,
+          "max": 660.0,
+          "count": 22
+        },
+        "coal_price_usd_per_mt": {
+          "mean": 122.81363636363636,
+          "median": 121.4,
+          "std": 15.902419565963793,
+          "min": 98.6,
+          "max": 146.6,
+          "count": 22
+        },
+        "iron_ore_price_usd_per_dmt": {
+          "mean": 103.39545454545454,
+          "median": 101.80000000000001,
+          "std": 7.747963005586099,
+          "min": 92.3,
+          "max": 124.4,
+          "count": 22
+        },
+        "wind_kmh": {
+          "mean": 33.9421090909091,
+          "median": 30.7432,
+          "std": 11.983971556442702,
+          "min": 19.446,
+          "max": 55.189600000000006,
+          "count": 22
+        },
+        "wave_height_m": {
+          "mean": 2.3227272727272723,
+          "median": 2.1500000000000004,
+          "std": 1.0169664592408045,
+          "min": 1.1,
+          "max": 4.1,
+          "count": 22
+        },
+        "cyclone_risk": {
+          "mean": 2.772727272727273,
+          "median": 2.0,
+          "std": 1.2317938209440804,
+          "min": 1.0,
+          "max": 5.0,
+          "count": 22
+        },
+        "weather_delay_days": {
+          "mean": 2.0,
+          "median": 2.25,
+          "std": 1.3451854182690985,
+          "min": 0.0,
+          "max": 4.0,
+          "count": 22
+        },
+        "current_freight_usd_per_tonne": {
+          "mean": 12.2,
+          "median": 12.149999999999999,
+          "std": 1.4382529084175106,
+          "min": 9.9,
+          "max": 14.5,
+          "count": 22
+        }
+      },
+      "freight_pct_change": {
+        "mean": 1.4446635725884922,
+        "std": 12.218072513797022,
+        "min": -22.22222222222222,
+        "max": 33.98058252427185
+      }
+    }
+  },
+  "correlation_global": {
+    "bdi": {
+      "bdi": 1.0,
+      "vlsfo_usd_per_tonne": 0.913,
+      "coal_price_usd_per_mt": -0.0794,
+      "iron_ore_price_usd_per_dmt": -0.0026,
+      "wind_kmh": -0.1188,
+      "wave_height_m": -0.085,
+      "cyclone_risk": 0.563,
+      "weather_delay_days": 0.1342,
+      "current_freight_usd_per_tonne": 0.5254,
+      "next_month_freight_usd_per_tonne": 0.2756
+    },
+    "vlsfo_usd_per_tonne": {
+      "bdi": 0.913,
+      "vlsfo_usd_per_tonne": 1.0,
+      "coal_price_usd_per_mt": 0.1789,
+      "iron_ore_price_usd_per_dmt": 0.2747,
+      "wind_kmh": -0.119,
+      "wave_height_m": -0.086,
+      "cyclone_risk": 0.4403,
+      "weather_delay_days": 0.0709,
+      "current_freight_usd_per_tonne": 0.4775,
+      "next_month_freight_usd_per_tonne": 0.2419
+    },
+    "coal_price_usd_per_mt": {
+      "bdi": -0.0794,
+      "vlsfo_usd_per_tonne": 0.1789,
+      "coal_price_usd_per_mt": 1.0,
+      "iron_ore_price_usd_per_dmt": 0.3147,
+      "wind_kmh": 0.0838,
+      "wave_height_m": 0.1047,
+      "cyclone_risk": 0.0855,
+      "weather_delay_days": 0.137,
+      "current_freight_usd_per_tonne": -0.0653,
+      "next_month_freight_usd_per_tonne": -0.1409
+    },
+    "iron_ore_price_usd_per_dmt": {
+      "bdi": -0.0026,
+      "vlsfo_usd_per_tonne": 0.2747,
+      "coal_price_usd_per_mt": 0.3147,
+      "iron_ore_price_usd_per_dmt": 1.0,
+      "wind_kmh": -0.3014,
+      "wave_height_m": -0.3006,
+      "cyclone_risk": -0.1109,
+      "weather_delay_days": -0.3248,
+      "current_freight_usd_per_tonne": -0.0095,
+      "next_month_freight_usd_per_tonne": -0.0043
+    },
+    "wind_kmh": {
+      "bdi": -0.1188,
+      "vlsfo_usd_per_tonne": -0.119,
+      "coal_price_usd_per_mt": 0.0838,
+      "iron_ore_price_usd_per_dmt": -0.3014,
+      "wind_kmh": 1.0,
+      "wave_height_m": 0.9958,
+      "cyclone_risk": 0.0666,
+      "weather_delay_days": 0.7494,
+      "current_freight_usd_per_tonne": -0.0136,
+      "next_month_freight_usd_per_tonne": -0.1726
+    },
+    "wave_height_m": {
+      "bdi": -0.085,
+      "vlsfo_usd_per_tonne": -0.086,
+      "coal_price_usd_per_mt": 0.1047,
+      "iron_ore_price_usd_per_dmt": -0.3006,
+      "wind_kmh": 0.9958,
+      "wave_height_m": 1.0,
+      "cyclone_risk": 0.1174,
+      "weather_delay_days": 0.7828,
+      "current_freight_usd_per_tonne": -0.0077,
+      "next_month_freight_usd_per_tonne": -0.1654
+    },
+    "cyclone_risk": {
+      "bdi": 0.563,
+      "vlsfo_usd_per_tonne": 0.4403,
+      "coal_price_usd_per_mt": 0.0855,
+      "iron_ore_price_usd_per_dmt": -0.1109,
+      "wind_kmh": 0.0666,
+      "wave_height_m": 0.1174,
+      "cyclone_risk": 1.0,
+      "weather_delay_days": 0.5604,
+      "current_freight_usd_per_tonne": 0.2968,
+      "next_month_freight_usd_per_tonne": 0.234
+    },
+    "weather_delay_days": {
+      "bdi": 0.1342,
+      "vlsfo_usd_per_tonne": 0.0709,
+      "coal_price_usd_per_mt": 0.137,
+      "iron_ore_price_usd_per_dmt": -0.3248,
+      "wind_kmh": 0.7494,
+      "wave_height_m": 0.7828,
+      "cyclone_risk": 0.5604,
+      "weather_delay_days": 1.0,
+      "current_freight_usd_per_tonne": 0.0928,
+      "next_month_freight_usd_per_tonne": -0.0473
+    },
+    "current_freight_usd_per_tonne": {
+      "bdi": 0.5254,
+      "vlsfo_usd_per_tonne": 0.4775,
+      "coal_price_usd_per_mt": -0.0653,
+      "iron_ore_price_usd_per_dmt": -0.0095,
+      "wind_kmh": -0.0136,
+      "wave_height_m": -0.0077,
+      "cyclone_risk": 0.2968,
+      "weather_delay_days": 0.0928,
+      "current_freight_usd_per_tonne": 1.0,
+      "next_month_freight_usd_per_tonne": 0.8567
+    },
+    "next_month_freight_usd_per_tonne": {
+      "bdi": 0.2756,
+      "vlsfo_usd_per_tonne": 0.2419,
+      "coal_price_usd_per_mt": -0.1409,
+      "iron_ore_price_usd_per_dmt": -0.0043,
+      "wind_kmh": -0.1726,
+      "wave_height_m": -0.1654,
+      "cyclone_risk": 0.234,
+      "weather_delay_days": -0.0473,
+      "current_freight_usd_per_tonne": 0.8567,
+      "next_month_freight_usd_per_tonne": 1.0
+    }
+  },
+  "per_combination_correlations": {
+    "Australia West Coast|East Coast India|Iron Ore|Capesize": {
+      "bdi": {
+        "bdi": 1.0,
+        "vlsfo_usd_per_tonne": 0.913,
+        "coal_price_usd_per_mt": -0.0794,
+        "iron_ore_price_usd_per_dmt": -0.0026,
+        "wind_kmh": -0.0983,
+        "wave_height_m": -0.0663,
+        "cyclone_risk": 0.563,
+        "weather_delay_days": 0.1342,
+        "current_freight_usd_per_tonne": 0.9859,
+        "next_month_freight_usd_per_tonne": 0.5158
+      },
+      "vlsfo_usd_per_tonne": {
+        "bdi": 0.913,
+        "vlsfo_usd_per_tonne": 1.0,
+        "coal_price_usd_per_mt": 0.1789,
+        "iron_ore_price_usd_per_dmt": 0.2747,
+        "wind_kmh": -0.0969,
+        "wave_height_m": -0.0673,
+        "cyclone_risk": 0.4403,
+        "weather_delay_days": 0.0709,
+        "current_freight_usd_per_tonne": 0.8681,
+        "next_month_freight_usd_per_tonne": 0.4422
+      },
+      "coal_price_usd_per_mt": {
+        "bdi": -0.0794,
+        "vlsfo_usd_per_tonne": 0.1789,
+        "coal_price_usd_per_mt": 1.0,
+        "iron_ore_price_usd_per_dmt": 0.3147,
+        "wind_kmh": 0.0707,
+        "wave_height_m": 0.0975,
+        "cyclone_risk": 0.0855,
+        "weather_delay_days": 0.137,
+        "current_freight_usd_per_tonne": -0.1371,
+        "next_month_freight_usd_per_tonne": -0.266
+      },
+      "iron_ore_price_usd_per_dmt": {
+        "bdi": -0.0026,
+        "vlsfo_usd_per_tonne": 0.2747,
+        "coal_price_usd_per_mt": 0.3147,
+        "iron_ore_price_usd_per_dmt": 1.0,
+        "wind_kmh": -0.3066,
+        "wave_height_m": -0.3013,
+        "cyclone_risk": -0.1109,
+        "weather_delay_days": -0.3248,
+        "current_freight_usd_per_tonne": -0.0697,
+        "next_month_freight_usd_per_tonne": -0.0528
+      },
+      "wind_kmh": {
+        "bdi": -0.0983,
+        "vlsfo_usd_per_tonne": -0.0969,
+        "coal_price_usd_per_mt": 0.0707,
+        "iron_ore_price_usd_per_dmt": -0.3066,
+        "wind_kmh": 1.0,
+        "wave_height_m": 0.9971,
+        "cyclone_risk": 0.0602,
+        "weather_delay_days": 0.748,
+        "current_freight_usd_per_tonne": -0.0273,
+        "next_month_freight_usd_per_tonne": -0.3335
+      },
+      "wave_height_m": {
+        "bdi": -0.0663,
+        "vlsfo_usd_per_tonne": -0.0673,
+        "coal_price_usd_per_mt": 0.0975,
+        "iron_ore_price_usd_per_dmt": -0.3013,
+        "wind_kmh": 0.9971,
+        "wave_height_m": 1.0,
+        "cyclone_risk": 0.1035,
+        "weather_delay_days": 0.7806,
+        "current_freight_usd_per_tonne": 0.0038,
+        "next_month_freight_usd_per_tonne": -0.3237
+      },
+      "cyclone_risk": {
+        "bdi": 0.563,
+        "vlsfo_usd_per_tonne": 0.4403,
+        "coal_price_usd_per_mt": 0.0855,
+        "iron_ore_price_usd_per_dmt": -0.1109,
+        "wind_kmh": 0.0602,
+        "wave_height_m": 0.1035,
+        "cyclone_risk": 1.0,
+        "weather_delay_days": 0.5604,
+        "current_freight_usd_per_tonne": 0.5826,
+        "next_month_freight_usd_per_tonne": 0.4278
+      },
+      "weather_delay_days": {
+        "bdi": 0.1342,
+        "vlsfo_usd_per_tonne": 0.0709,
+        "coal_price_usd_per_mt": 0.137,
+        "iron_ore_price_usd_per_dmt": -0.3248,
+        "wind_kmh": 0.748,
+        "wave_height_m": 0.7806,
+        "cyclone_risk": 0.5604,
+        "weather_delay_days": 1.0,
+        "current_freight_usd_per_tonne": 0.2032,
+        "next_month_freight_usd_per_tonne": -0.0959
+      },
+      "current_freight_usd_per_tonne": {
+        "bdi": 0.9859,
+        "vlsfo_usd_per_tonne": 0.8681,
+        "coal_price_usd_per_mt": -0.1371,
+        "iron_ore_price_usd_per_dmt": -0.0697,
+        "wind_kmh": -0.0273,
+        "wave_height_m": 0.0038,
+        "cyclone_risk": 0.5826,
+        "weather_delay_days": 0.2032,
+        "current_freight_usd_per_tonne": 1.0,
+        "next_month_freight_usd_per_tonne": 0.5148
+      },
+      "next_month_freight_usd_per_tonne": {
+        "bdi": 0.5158,
+        "vlsfo_usd_per_tonne": 0.4422,
+        "coal_price_usd_per_mt": -0.266,
+        "iron_ore_price_usd_per_dmt": -0.0528,
+        "wind_kmh": -0.3335,
+        "wave_height_m": -0.3237,
+        "cyclone_risk": 0.4278,
+        "weather_delay_days": -0.0959,
+        "current_freight_usd_per_tonne": 0.5148,
+        "next_month_freight_usd_per_tonne": 1.0
+      }
+    },
+    "Hay Point|East Coast India|Coal|Capesize": {
+      "bdi": {
+        "bdi": 1.0,
+        "vlsfo_usd_per_tonne": 0.913,
+        "coal_price_usd_per_mt": -0.0794,
+        "iron_ore_price_usd_per_dmt": -0.0026,
+        "wind_kmh": -0.166,
+        "wave_height_m": -0.1157,
+        "cyclone_risk": 0.563,
+        "weather_delay_days": 0.1342,
+        "current_freight_usd_per_tonne": 0.9917,
+        "next_month_freight_usd_per_tonne": 0.4935
+      },
+      "vlsfo_usd_per_tonne": {
+        "bdi": 0.913,
+        "vlsfo_usd_per_tonne": 1.0,
+        "coal_price_usd_per_mt": 0.1789,
+        "iron_ore_price_usd_per_dmt": 0.2747,
+        "wind_kmh": -0.1601,
+        "wave_height_m": -0.1109,
+        "cyclone_risk": 0.4403,
+        "weather_delay_days": 0.0709,
+        "current_freight_usd_per_tonne": 0.9049,
+        "next_month_freight_usd_per_tonne": 0.4334
+      },
+      "coal_price_usd_per_mt": {
+        "bdi": -0.0794,
+        "vlsfo_usd_per_tonne": 0.1789,
+        "coal_price_usd_per_mt": 1.0,
+        "iron_ore_price_usd_per_dmt": 0.3147,
+        "wind_kmh": 0.0692,
+        "wave_height_m": 0.087,
+        "cyclone_risk": 0.0855,
+        "weather_delay_days": 0.137,
+        "current_freight_usd_per_tonne": -0.1126,
+        "next_month_freight_usd_per_tonne": -0.2578
+      },
+      "iron_ore_price_usd_per_dmt": {
+        "bdi": -0.0026,
+        "vlsfo_usd_per_tonne": 0.2747,
+        "coal_price_usd_per_mt": 0.3147,
+        "iron_ore_price_usd_per_dmt": 1.0,
+        "wind_kmh": -0.2782,
+        "wave_height_m": -0.2677,
+        "cyclone_risk": -0.1109,
+        "weather_delay_days": -0.3248,
+        "current_freight_usd_per_tonne": -0.0125,
+        "next_month_freight_usd_per_tonne": -0.0144
+      },
+      "wind_kmh": {
+        "bdi": -0.166,
+        "vlsfo_usd_per_tonne": -0.1601,
+        "coal_price_usd_per_mt": 0.0692,
+        "iron_ore_price_usd_per_dmt": -0.2782,
+        "wind_kmh": 1.0,
+        "wave_height_m": 0.9928,
+        "cyclone_risk": 0.0256,
+        "weather_delay_days": 0.7485,
+        "current_freight_usd_per_tonne": -0.1253,
+        "next_month_freight_usd_per_tonne": -0.458
+      },
+      "wave_height_m": {
+        "bdi": -0.1157,
+        "vlsfo_usd_per_tonne": -0.1109,
+        "coal_price_usd_per_mt": 0.087,
+        "iron_ore_price_usd_per_dmt": -0.2677,
+        "wind_kmh": 0.9928,
+        "wave_height_m": 1.0,
+        "cyclone_risk": 0.1004,
+        "weather_delay_days": 0.7815,
+        "current_freight_usd_per_tonne": -0.0756,
+        "next_month_freight_usd_per_tonne": -0.384
+      },
+      "cyclone_risk": {
+        "bdi": 0.563,
+        "vlsfo_usd_per_tonne": 0.4403,
+        "coal_price_usd_per_mt": 0.0855,
+        "iron_ore_price_usd_per_dmt": -0.1109,
+        "wind_kmh": 0.0256,
+        "wave_height_m": 0.1004,
+        "cyclone_risk": 1.0,
+        "weather_delay_days": 0.5604,
+        "current_freight_usd_per_tonne": 0.5835,
+        "next_month_freight_usd_per_tonne": 0.4467
+      },
+      "weather_delay_days": {
+        "bdi": 0.1342,
+        "vlsfo_usd_per_tonne": 0.0709,
+        "coal_price_usd_per_mt": 0.137,
+        "iron_ore_price_usd_per_dmt": -0.3248,
+        "wind_kmh": 0.7485,
+        "wave_height_m": 0.7815,
+        "cyclone_risk": 0.5604,
+        "weather_delay_days": 1.0,
+        "current_freight_usd_per_tonne": 0.1973,
+        "next_month_freight_usd_per_tonne": -0.0624
+      },
+      "current_freight_usd_per_tonne": {
+        "bdi": 0.9917,
+        "vlsfo_usd_per_tonne": 0.9049,
+        "coal_price_usd_per_mt": -0.1126,
+        "iron_ore_price_usd_per_dmt": -0.0125,
+        "wind_kmh": -0.1253,
+        "wave_height_m": -0.0756,
+        "cyclone_risk": 0.5835,
+        "weather_delay_days": 0.1973,
+        "current_freight_usd_per_tonne": 1.0,
+        "next_month_freight_usd_per_tonne": 0.5149
+      },
+      "next_month_freight_usd_per_tonne": {
+        "bdi": 0.4935,
+        "vlsfo_usd_per_tonne": 0.4334,
+        "coal_price_usd_per_mt": -0.2578,
+        "iron_ore_price_usd_per_dmt": -0.0144,
+        "wind_kmh": -0.458,
+        "wave_height_m": -0.384,
+        "cyclone_risk": 0.4467,
+        "weather_delay_days": -0.0624,
+        "current_freight_usd_per_tonne": 0.5149,
+        "next_month_freight_usd_per_tonne": 1.0
+      }
+    },
+    "Hay Point|East Coast India|Coal|Panamax": {
+      "bdi": {
+        "bdi": 1.0,
+        "vlsfo_usd_per_tonne": 0.913,
+        "coal_price_usd_per_mt": -0.0794,
+        "iron_ore_price_usd_per_dmt": -0.0026,
+        "wind_kmh": -0.166,
+        "wave_height_m": -0.1157,
+        "cyclone_risk": 0.563,
+        "weather_delay_days": 0.1342,
+        "current_freight_usd_per_tonne": 0.9942,
+        "next_month_freight_usd_per_tonne": 0.4964
+      },
+      "vlsfo_usd_per_tonne": {
+        "bdi": 0.913,
+        "vlsfo_usd_per_tonne": 1.0,
+        "coal_price_usd_per_mt": 0.1789,
+        "iron_ore_price_usd_per_dmt": 0.2747,
+        "wind_kmh": -0.1601,
+        "wave_height_m": -0.1109,
+        "cyclone_risk": 0.4403,
+        "weather_delay_days": 0.0709,
+        "current_freight_usd_per_tonne": 0.8934,
+        "next_month_freight_usd_per_tonne": 0.4276
+      },
+      "coal_price_usd_per_mt": {
+        "bdi": -0.0794,
+        "vlsfo_usd_per_tonne": 0.1789,
+        "coal_price_usd_per_mt": 1.0,
+        "iron_ore_price_usd_per_dmt": 0.3147,
+        "wind_kmh": 0.0692,
+        "wave_height_m": 0.087,
+        "cyclone_risk": 0.0855,
+        "weather_delay_days": 0.137,
+        "current_freight_usd_per_tonne": -0.1275,
+        "next_month_freight_usd_per_tonne": -0.2677
+      },
+      "iron_ore_price_usd_per_dmt": {
+        "bdi": -0.0026,
+        "vlsfo_usd_per_tonne": 0.2747,
+        "coal_price_usd_per_mt": 0.3147,
+        "iron_ore_price_usd_per_dmt": 1.0,
+        "wind_kmh": -0.2782,
+        "wave_height_m": -0.2677,
+        "cyclone_risk": -0.1109,
+        "weather_delay_days": -0.3248,
+        "current_freight_usd_per_tonne": -0.0419,
+        "next_month_freight_usd_per_tonne": -0.0265
+      },
+      "wind_kmh": {
+        "bdi": -0.166,
+        "vlsfo_usd_per_tonne": -0.1601,
+        "coal_price_usd_per_mt": 0.0692,
+        "iron_ore_price_usd_per_dmt": -0.2782,
+        "wind_kmh": 1.0,
+        "wave_height_m": 0.9928,
+        "cyclone_risk": 0.0256,
+        "weather_delay_days": 0.7485,
+        "current_freight_usd_per_tonne": -0.1231,
+        "next_month_freight_usd_per_tonne": -0.4772
+      },
+      "wave_height_m": {
+        "bdi": -0.1157,
+        "vlsfo_usd_per_tonne": -0.1109,
+        "coal_price_usd_per_mt": 0.087,
+        "iron_ore_price_usd_per_dmt": -0.2677,
+        "wind_kmh": 0.9928,
+        "wave_height_m": 1.0,
+        "cyclone_risk": 0.1004,
+        "weather_delay_days": 0.7815,
+        "current_freight_usd_per_tonne": -0.0732,
+        "next_month_freight_usd_per_tonne": -0.4024
+      },
+      "cyclone_risk": {
+        "bdi": 0.563,
+        "vlsfo_usd_per_tonne": 0.4403,
+        "coal_price_usd_per_mt": 0.0855,
+        "iron_ore_price_usd_per_dmt": -0.1109,
+        "wind_kmh": 0.0256,
+        "wave_height_m": 0.1004,
+        "cyclone_risk": 1.0,
+        "weather_delay_days": 0.5604,
+        "current_freight_usd_per_tonne": 0.5765,
+        "next_month_freight_usd_per_tonne": 0.4278
+      },
+      "weather_delay_days": {
+        "bdi": 0.1342,
+        "vlsfo_usd_per_tonne": 0.0709,
+        "coal_price_usd_per_mt": 0.137,
+        "iron_ore_price_usd_per_dmt": -0.3248,
+        "wind_kmh": 0.7485,
+        "wave_height_m": 0.7815,
+        "cyclone_risk": 0.5604,
+        "weather_delay_days": 1.0,
+        "current_freight_usd_per_tonne": 0.1824,
+        "next_month_freight_usd_per_tonne": -0.0944
+      },
+      "current_freight_usd_per_tonne": {
+        "bdi": 0.9942,
+        "vlsfo_usd_per_tonne": 0.8934,
+        "coal_price_usd_per_mt": -0.1275,
+        "iron_ore_price_usd_per_dmt": -0.0419,
+        "wind_kmh": -0.1231,
+        "wave_height_m": -0.0732,
+        "cyclone_risk": 0.5765,
+        "weather_delay_days": 0.1824,
+        "current_freight_usd_per_tonne": 1.0,
+        "next_month_freight_usd_per_tonne": 0.5078
+      },
+      "next_month_freight_usd_per_tonne": {
+        "bdi": 0.4964,
+        "vlsfo_usd_per_tonne": 0.4276,
+        "coal_price_usd_per_mt": -0.2677,
+        "iron_ore_price_usd_per_dmt": -0.0265,
+        "wind_kmh": -0.4772,
+        "wave_height_m": -0.4024,
+        "cyclone_risk": 0.4278,
+        "weather_delay_days": -0.0944,
+        "current_freight_usd_per_tonne": 0.5078,
+        "next_month_freight_usd_per_tonne": 1.0
+      }
+    },
+    "Taboneo|East Coast India|Thermal Coal|Panamax": {
+      "bdi": {
+        "bdi": 1.0,
+        "vlsfo_usd_per_tonne": 0.913,
+        "coal_price_usd_per_mt": -0.0794,
+        "iron_ore_price_usd_per_dmt": -0.0026,
+        "wind_kmh": -0.1048,
+        "wave_height_m": -0.0759,
+        "cyclone_risk": 0.563,
+        "weather_delay_days": 0.1342,
+        "current_freight_usd_per_tonne": 0.9923,
+        "next_month_freight_usd_per_tonne": 0.5372
+      },
+      "vlsfo_usd_per_tonne": {
+        "bdi": 0.913,
+        "vlsfo_usd_per_tonne": 1.0,
+        "coal_price_usd_per_mt": 0.1789,
+        "iron_ore_price_usd_per_dmt": 0.2747,
+        "wind_kmh": -0.1096,
+        "wave_height_m": -0.0809,
+        "cyclone_risk": 0.4403,
+        "weather_delay_days": 0.0709,
+        "current_freight_usd_per_tonne": 0.9235,
+        "next_month_freight_usd_per_tonne": 0.4861
+      },
+      "coal_price_usd_per_mt": {
+        "bdi": -0.0794,
+        "vlsfo_usd_per_tonne": 0.1789,
+        "coal_price_usd_per_mt": 1.0,
+        "iron_ore_price_usd_per_dmt": 0.3147,
+        "wind_kmh": 0.1046,
+        "wave_height_m": 0.1252,
+        "cyclone_risk": 0.0855,
+        "weather_delay_days": 0.137,
+        "current_freight_usd_per_tonne": -0.1175,
+        "next_month_freight_usd_per_tonne": -0.254
+      },
+      "iron_ore_price_usd_per_dmt": {
+        "bdi": -0.0026,
+        "vlsfo_usd_per_tonne": 0.2747,
+        "coal_price_usd_per_mt": 0.3147,
+        "iron_ore_price_usd_per_dmt": 1.0,
+        "wind_kmh": -0.3334,
+        "wave_height_m": -0.337,
+        "cyclone_risk": -0.1109,
+        "weather_delay_days": -0.3248,
+        "current_freight_usd_per_tonne": 0.0297,
+        "next_month_freight_usd_per_tonne": 0.0475
+      },
+      "wind_kmh": {
+        "bdi": -0.1048,
+        "vlsfo_usd_per_tonne": -0.1096,
+        "coal_price_usd_per_mt": 0.1046,
+        "iron_ore_price_usd_per_dmt": -0.3334,
+        "wind_kmh": 1.0,
+        "wave_height_m": 0.9983,
+        "cyclone_risk": 0.1006,
+        "weather_delay_days": 0.7982,
+        "current_freight_usd_per_tonne": -0.0891,
+        "next_month_freight_usd_per_tonne": -0.3872
+      },
+      "wave_height_m": {
+        "bdi": -0.0759,
+        "vlsfo_usd_per_tonne": -0.0809,
+        "coal_price_usd_per_mt": 0.1252,
+        "iron_ore_price_usd_per_dmt": -0.337,
+        "wind_kmh": 0.9983,
+        "wave_height_m": 1.0,
+        "cyclone_risk": 0.1412,
+        "weather_delay_days": 0.8198,
+        "current_freight_usd_per_tonne": -0.0633,
+        "next_month_freight_usd_per_tonne": -0.3546
+      },
+      "cyclone_risk": {
+        "bdi": 0.563,
+        "vlsfo_usd_per_tonne": 0.4403,
+        "coal_price_usd_per_mt": 0.0855,
+        "iron_ore_price_usd_per_dmt": -0.1109,
+        "wind_kmh": 0.1006,
+        "wave_height_m": 0.1412,
+        "cyclone_risk": 1.0,
+        "weather_delay_days": 0.5604,
+        "current_freight_usd_per_tonne": 0.5071,
+        "next_month_freight_usd_per_tonne": 0.4326
+      },
+      "weather_delay_days": {
+        "bdi": 0.1342,
+        "vlsfo_usd_per_tonne": 0.0709,
+        "coal_price_usd_per_mt": 0.137,
+        "iron_ore_price_usd_per_dmt": -0.3248,
+        "wind_kmh": 0.7982,
+        "wave_height_m": 0.8198,
+        "cyclone_risk": 0.5604,
+        "weather_delay_days": 1.0,
+        "current_freight_usd_per_tonne": 0.1227,
+        "next_month_freight_usd_per_tonne": -0.1118
+      },
+      "current_freight_usd_per_tonne": {
+        "bdi": 0.9923,
+        "vlsfo_usd_per_tonne": 0.9235,
+        "coal_price_usd_per_mt": -0.1175,
+        "iron_ore_price_usd_per_dmt": 0.0297,
+        "wind_kmh": -0.0891,
+        "wave_height_m": -0.0633,
+        "cyclone_risk": 0.5071,
+        "weather_delay_days": 0.1227,
+        "current_freight_usd_per_tonne": 1.0,
+        "next_month_freight_usd_per_tonne": 0.5227
+      },
+      "next_month_freight_usd_per_tonne": {
+        "bdi": 0.5372,
+        "vlsfo_usd_per_tonne": 0.4861,
+        "coal_price_usd_per_mt": -0.254,
+        "iron_ore_price_usd_per_dmt": 0.0475,
+        "wind_kmh": -0.3872,
+        "wave_height_m": -0.3546,
+        "cyclone_risk": 0.4326,
+        "weather_delay_days": -0.1118,
+        "current_freight_usd_per_tonne": 0.5227,
+        "next_month_freight_usd_per_tonne": 1.0
+      }
+    },
+    "Taboneo|East Coast India|Thermal Coal|Supramax": {
+      "bdi": {
+        "bdi": 1.0,
+        "vlsfo_usd_per_tonne": 0.913,
+        "coal_price_usd_per_mt": -0.0794,
+        "iron_ore_price_usd_per_dmt": -0.0026,
+        "wind_kmh": -0.1048,
+        "wave_height_m": -0.0759,
+        "cyclone_risk": 0.563,
+        "weather_delay_days": 0.1342,
+        "current_freight_usd_per_tonne": 0.9897,
+        "next_month_freight_usd_per_tonne": 0.5365
+      },
+      "vlsfo_usd_per_tonne": {
+        "bdi": 0.913,
+        "vlsfo_usd_per_tonne": 1.0,
+        "coal_price_usd_per_mt": 0.1789,
+        "iron_ore_price_usd_per_dmt": 0.2747,
+        "wind_kmh": -0.1096,
+        "wave_height_m": -0.0809,
+        "cyclone_risk": 0.4403,
+        "weather_delay_days": 0.0709,
+        "current_freight_usd_per_tonne": 0.9224,
+        "next_month_freight_usd_per_tonne": 0.4821
+      },
+      "coal_price_usd_per_mt": {
+        "bdi": -0.0794,
+        "vlsfo_usd_per_tonne": 0.1789,
+        "coal_price_usd_per_mt": 1.0,
+        "iron_ore_price_usd_per_dmt": 0.3147,
+        "wind_kmh": 0.1046,
+        "wave_height_m": 0.1252,
+        "cyclone_risk": 0.0855,
+        "weather_delay_days": 0.137,
+        "current_freight_usd_per_tonne": -0.1203,
+        "next_month_freight_usd_per_tonne": -0.2619
+      },
+      "iron_ore_price_usd_per_dmt": {
+        "bdi": -0.0026,
+        "vlsfo_usd_per_tonne": 0.2747,
+        "coal_price_usd_per_mt": 0.3147,
+        "iron_ore_price_usd_per_dmt": 1.0,
+        "wind_kmh": -0.3334,
+        "wave_height_m": -0.337,
+        "cyclone_risk": -0.1109,
+        "weather_delay_days": -0.3248,
+        "current_freight_usd_per_tonne": 0.0286,
+        "next_month_freight_usd_per_tonne": 0.0296
+      },
+      "wind_kmh": {
+        "bdi": -0.1048,
+        "vlsfo_usd_per_tonne": -0.1096,
+        "coal_price_usd_per_mt": 0.1046,
+        "iron_ore_price_usd_per_dmt": -0.3334,
+        "wind_kmh": 1.0,
+        "wave_height_m": 0.9983,
+        "cyclone_risk": 0.1006,
+        "weather_delay_days": 0.7982,
+        "current_freight_usd_per_tonne": -0.0743,
+        "next_month_freight_usd_per_tonne": -0.3632
+      },
+      "wave_height_m": {
+        "bdi": -0.0759,
+        "vlsfo_usd_per_tonne": -0.0809,
+        "coal_price_usd_per_mt": 0.1252,
+        "iron_ore_price_usd_per_dmt": -0.337,
+        "wind_kmh": 0.9983,
+        "wave_height_m": 1.0,
+        "cyclone_risk": 0.1412,
+        "weather_delay_days": 0.8198,
+        "current_freight_usd_per_tonne": -0.0479,
+        "next_month_freight_usd_per_tonne": -0.3306
+      },
+      "cyclone_risk": {
+        "bdi": 0.563,
+        "vlsfo_usd_per_tonne": 0.4403,
+        "coal_price_usd_per_mt": 0.0855,
+        "iron_ore_price_usd_per_dmt": -0.1109,
+        "wind_kmh": 0.1006,
+        "wave_height_m": 0.1412,
+        "cyclone_risk": 1.0,
+        "weather_delay_days": 0.5604,
+        "current_freight_usd_per_tonne": 0.5214,
+        "next_month_freight_usd_per_tonne": 0.4404
+      },
+      "weather_delay_days": {
+        "bdi": 0.1342,
+        "vlsfo_usd_per_tonne": 0.0709,
+        "coal_price_usd_per_mt": 0.137,
+        "iron_ore_price_usd_per_dmt": -0.3248,
+        "wind_kmh": 0.7982,
+        "wave_height_m": 0.8198,
+        "cyclone_risk": 0.5604,
+        "weather_delay_days": 1.0,
+        "current_freight_usd_per_tonne": 0.1464,
+        "next_month_freight_usd_per_tonne": -0.084
+      },
+      "current_freight_usd_per_tonne": {
+        "bdi": 0.9897,
+        "vlsfo_usd_per_tonne": 0.9224,
+        "coal_price_usd_per_mt": -0.1203,
+        "iron_ore_price_usd_per_dmt": 0.0286,
+        "wind_kmh": -0.0743,
+        "wave_height_m": -0.0479,
+        "cyclone_risk": 0.5214,
+        "weather_delay_days": 0.1464,
+        "current_freight_usd_per_tonne": 1.0,
+        "next_month_freight_usd_per_tonne": 0.5335
+      },
+      "next_month_freight_usd_per_tonne": {
+        "bdi": 0.5365,
+        "vlsfo_usd_per_tonne": 0.4821,
+        "coal_price_usd_per_mt": -0.2619,
+        "iron_ore_price_usd_per_dmt": 0.0296,
+        "wind_kmh": -0.3632,
+        "wave_height_m": -0.3306,
+        "cyclone_risk": 0.4404,
+        "weather_delay_days": -0.084,
+        "current_freight_usd_per_tonne": 0.5335,
+        "next_month_freight_usd_per_tonne": 1.0
+      }
+    }
+  },
+  "combinations": [
+    "Australia West Coast|East Coast India|Iron Ore|Capesize",
+    "Hay Point|East Coast India|Coal|Capesize",
+    "Hay Point|East Coast India|Coal|Panamax",
+    "Taboneo|East Coast India|Thermal Coal|Panamax",
+    "Taboneo|East Coast India|Thermal Coal|Supramax"
+  ],
+  "numeric_features": [
+    "bdi",
+    "vlsfo_usd_per_tonne",
+    "coal_price_usd_per_mt",
+    "iron_ore_price_usd_per_dmt",
+    "wind_kmh",
+    "wave_height_m",
+    "cyclone_risk",
+    "weather_delay_days",
+    "current_freight_usd_per_tonne"
+  ]
+}
