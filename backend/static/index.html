@@ -1,309 +1,725 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Freight Forecast — Bulk Cargo</title>
-<style>
-:root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-2: #334155;
-  --border: #475569;
-  --text: #f1f5f9;
-  --text-dim: #94a3b8;
-  --accent: #38bdf8;
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --red: #f87171;
-  --radius: 10px;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg); color: var(--text);
-  min-height: 100vh; padding: 20px;
-  display: flex; flex-direction: column; align-items: center;
-}
-.container { max-width: 900px; width: 100%; }
-header { text-align: center; margin-bottom: 30px; }
-header h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
-header p { color: var(--text-dim); margin-top: 6px; font-size: 0.95rem; }
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
-}
-.card h2 { font-size: 1.1rem; margin-bottom: 16px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.form-field { display: flex; flex-direction: column; gap: 4px; }
-.form-field.full { grid-column: 1 / -1; }
-.form-field label { font-size: 0.8rem; color: var(--text-dim); font-weight: 500; }
-.form-field select, .form-field input {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem;
-  transition: border-color 0.15s;
-}
-.form-field select:focus, .form-field input:focus { outline: none; border-color: var(--accent); }
-.form-field input[type="number"] { width: 100%; }
-.form-field .hint { font-size: 0.7rem; color: var(--text-dim); font-style: italic; }
-.section-divider { grid-column: 1 / -1; border-top: 1px solid var(--border); margin: 8px 0; padding-top: 8px; }
-.section-divider span { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
-button.predict {
-  width: 100%; padding: 14px; background: var(--accent); color: var(--bg);
-  border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 700;
-  cursor: pointer; transition: opacity 0.15s; margin-top: 16px;
-}
-button.predict:hover { opacity: 0.9; }
-button.predict:disabled { opacity: 0.5; cursor: not-allowed; }
-.result-card { display: none; }
-.result-card.show { display: block; }
-.result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-.result-metric { text-align: center; }
-.result-metric .label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-.result-metric .value { font-size: 1.6rem; font-weight: 700; }
-.result-metric .sub { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
-.reco-banner {
-  padding: 16px; border-radius: var(--radius); text-align: center;
-  font-size: 1.2rem; font-weight: 700; margin-bottom: 16px;
-}
-.reco-CHARTER { background: rgba(248,113,113,0.15); border: 1px solid var(--red); color: var(--red); }
-.reco-WAIT { background: rgba(74,222,128,0.15); border: 1px solid var(--green); color: var(--green); }
-.reco-MONITOR { background: rgba(251,191,36,0.15); border: 1px solid var(--amber); color: var(--amber); }
-.reason { font-size: 0.9rem; color: var(--text-dim); text-align: center; margin-bottom: 20px; line-height: 1.4; }
-.sources-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.75rem; }
-.sources-grid .src { display: flex; justify-content: space-between; padding: 4px 8px; background: var(--surface-2); border-radius: 4px; }
-.sources-grid .src .field { color: var(--text-dim); }
-.sources-grid .src .prov { color: var(--accent); font-family: monospace; font-size: 0.7rem; }
-.error-msg { display: none; padding: 12px; background: rgba(248,113,113,0.1); border: 1px solid var(--red); border-radius: var(--radius); color: var(--red); font-size: 0.85rem; }
-.error-msg.show { display: block; }
-.status-bar { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; font-size: 0.75rem; color: var(--text-dim); }
-.status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 4px; }
-.status-bar .dot.off { background: var(--text-dim); }
-footer { text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 30px; }
-@media (max-width: 600px) {
-  .form-grid, .result-grid { grid-template-columns: 1fr; }
-  .sources-grid { grid-template-columns: 1fr; }
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freight Intelligence Platform — Institutional Grade</title>
+  
+  <!-- Typography: Geist & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <!-- Icons: Material Symbols Outlined -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  
+  <!-- Custom Nocturnal Intelligence Stylesheet -->
+  <link rel="stylesheet" href="/static/css/styles.css" />
 </head>
 <body>
-<div class="container">
-  <header>
-    <h1>Freight Forecast</h1>
-    <p>Bulk-cargo freight rate forecasting with weather-risk chartering recommendations</p>
+
+<div id="app-shell">
+
+  <!-- ====================================================================
+       1. Fixed Sidebar Navigation (256px)
+       ==================================================================== -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-title">
+        <span class="material-symbols-outlined brand-icon">directions_boat</span>
+        <span>Freight Intelligence</span>
+      </div>
+      <span class="brand-badge">Institutional Grade</span>
+    </div>
+
+    <ul class="nav-menu">
+      <li class="nav-item active">
+        <a href="#overview" data-route="overview">
+          <span class="material-symbols-outlined nav-icon">dashboard</span>
+          <span>Overview</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#forecast" data-route="forecast">
+          <span class="material-symbols-outlined nav-icon">trending_up</span>
+          <span>Forecast Engine</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#scenario" data-route="scenario">
+          <span class="material-symbols-outlined nav-icon">tune</span>
+          <span>What-If Scenario</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#routes" data-route="routes">
+          <span class="material-symbols-outlined nav-icon">map</span>
+          <span>Route Intel</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#market" data-route="market">
+          <span class="material-symbols-outlined nav-icon">show_chart</span>
+          <span>Market Intel</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#weather" data-route="weather">
+          <span class="material-symbols-outlined nav-icon">wb_sunny</span>
+          <span>Weather Intel</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="#sources" data-route="sources">
+          <span class="material-symbols-outlined nav-icon">database</span>
+          <span>Data & Sources</span>
+        </a>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="system-status-pill">
+        <span class="status-dot"></span>
+        <div style="flex:1;">
+          <div style="font-weight:600;color:var(--text-primary);">Model v3 Active</div>
+          <small style="color:var(--text-muted);">110 Historical Records</small>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ====================================================================
+       2. Top Application Bar
+       ==================================================================== -->
+  <header id="topbar">
+    <div class="topbar-left">
+      <h1 class="page-title" id="topbar-page-title">Overview Dashboard</h1>
+      <select class="route-quick-select" id="topbar-route-select" title="Switch Canonical Trade Lane">
+        <!-- Injected via JS -->
+      </select>
+    </div>
+
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="status-dot"></span>
+        <span>DB: WAL Nominal</span>
+      </div>
+      <button class="btn-icon" id="btn-global-refresh" title="Refresh Live Data">
+        <span class="material-symbols-outlined" style="font-size:20px;">refresh</span>
+      </button>
+    </div>
   </header>
 
-  <div class="status-bar" id="statusBar">
-    <span><span class="dot off" id="dotApi"></span>API</span>
-    <span><span class="dot off" id="dotWeather"></span>Weather DB</span>
-    <span><span class="dot off" id="dotMarket"></span>Market DB</span>
-  </div>
+  <!-- ====================================================================
+       3. Main Content Container
+       ==================================================================== -->
+  <main id="main-content">
 
-  <div class="card">
-    <h2>Forecast Request</h2>
-    <div class="form-grid">
-      <div class="form-field">
-        <label>Origin</label>
-        <select id="origin">
-          <option value="Hay Point">Hay Point (Australia East)</option>
-          <option value="Taboneo">Taboneo (Indonesia)</option>
-          <option value="Australia West Coast">Australia West Coast</option>
-        </select>
-      </div>
-      <div class="form-field">
-        <label>Destination</label>
-        <select id="destination">
-          <option value="East Coast India">East Coast India</option>
-        </select>
-      </div>
-      <div class="form-field">
-        <label>Commodity</label>
-        <select id="commodity">
-          <option value="Coal">Coal</option>
-          <option value="Thermal Coal">Thermal Coal</option>
-          <option value="Iron Ore">Iron Ore</option>
-        </select>
-      </div>
-      <div class="form-field">
-        <label>Vessel Type</label>
-        <select id="vessel_type">
-          <option value="Panamax">Panamax</option>
-          <option value="Supramax">Supramax</option>
-          <option value="Capesize">Capesize</option>
-        </select>
-      </div>
-      <div class="form-field full">
-        <label>Current Freight Rate (USD / tonne) *</label>
-        <input type="number" id="current_freight" step="0.1" min="0" value="16.5" placeholder="e.g. 16.5">
+    <!-- ------------------------------------------------------------------
+         SCREEN 1: OVERVIEW DASHBOARD (#overview)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container active" id="screen-overview">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">Executive Market Overview</h2>
+          <p class="screen-subtitle">Cross-market macro indicators, route benchmarks, and forward freight forecasts.</p>
+        </div>
       </div>
 
-      <div class="section-divider"><span>Optional — leave blank to auto-fill from database</span></div>
+      <!-- Macro KPI Row -->
+      <div class="grid-6">
+        <div class="kpi-card">
+          <span class="kpi-label">Baltic Dry Index</span>
+          <div class="kpi-value" id="ov-kpi-bdi">--</div>
+          <div class="kpi-subtext">Points (BDI)</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">VLSFO Bunker</span>
+          <div class="kpi-value" id="ov-kpi-vlsfo">--</div>
+          <div class="kpi-subtext">USD / tonne</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Coal API2</span>
+          <div class="kpi-value" id="ov-kpi-coal">--</div>
+          <div class="kpi-subtext">USD / MT</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Iron Ore 62%</span>
+          <div class="kpi-value" id="ov-kpi-fe">--</div>
+          <div class="kpi-subtext">USD / dmt</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Avg Freight Spot</span>
+          <div class="kpi-value" id="ov-kpi-avg-freight">--</div>
+          <div class="kpi-subtext">Cross-Route Benchmark</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">3M Trajectory</span>
+          <div style="margin-top:8px;">
+            <span class="trend-pill" id="ov-kpi-trend">--</span>
+          </div>
+          <div class="kpi-subtext">Rolling Momentum</div>
+        </div>
+      </div>
 
-      <div class="form-field">
-        <label>BDI (Baltic Dry Index)</label>
-        <input type="number" id="bdi" step="1" placeholder="auto">
+      <!-- Main Overview Grid -->
+      <div class="grid-12">
+        <!-- 5 Canonical Routes Table (8 cols) -->
+        <div class="col-8">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">route</span>
+                Canonical Trade Corridors (5 Active Routes)
+              </span>
+            </div>
+            <div class="data-table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Trade Corridor</th>
+                    <th>Current Spot</th>
+                    <th>Next-Month Fcst</th>
+                    <th>MoM Shift</th>
+                    <th>Recommendation</th>
+                  </tr>
+                </thead>
+                <tbody id="ov-routes-tbody">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deterministic Market Signals (4 cols) -->
+        <div class="col-4">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">radar</span>
+                Intelligence Signals
+              </span>
+            </div>
+            <div id="ov-signals-list">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="form-field">
-        <label>VLSFO (USD / tonne)</label>
-        <input type="number" id="vlsfo" step="1" placeholder="auto">
+
+      <!-- Origin Port Sea State Grid -->
+      <div class="screen-header" style="margin-top:16px;">
+        <h3 style="font-size:1.1rem;font-weight:600;">Origin Port Maritime Conditions</h3>
       </div>
-      <div class="form-field">
-        <label>Coal Price (USD / MT)</label>
-        <input type="number" id="coal_price" step="0.1" placeholder="auto">
-      </div>
-      <div class="form-field">
-        <label>Iron Ore Price (USD / dmt)</label>
-        <input type="number" id="iron_ore" step="0.1" placeholder="auto">
-      </div>
-      <div class="form-field">
-        <label>Wind Speed (km/h)</label>
-        <input type="number" id="wind_kmh" step="0.1" placeholder="auto">
-      </div>
-      <div class="form-field">
-        <label>Wave Height (m)</label>
-        <input type="number" id="wave_height" step="0.1" placeholder="auto">
-      </div>
-      <div class="form-field">
-        <label>Cyclone Risk (0–5)</label>
-        <input type="number" id="cyclone_risk" step="0.1" min="0" max="5" placeholder="auto">
-      </div>
-      <div class="form-field">
-        <label>Weather Delay (days)</label>
-        <input type="number" id="weather_delay" step="0.1" min="0" placeholder="auto">
+      <div class="grid-3" id="ov-weather-grid">
+        <!-- Injected via JS -->
       </div>
     </div>
-    <button class="predict" id="predictBtn" onclick="predict()">Forecast Next-Month Rate →</button>
-    <div class="error-msg" id="errorMsg"></div>
-  </div>
 
-  <div class="card result-card" id="resultCard">
-    <h2>Forecast Result</h2>
-    <div class="reco-banner" id="recoBanner"></div>
-    <div class="reason" id="reasonText"></div>
-    <div class="result-grid">
-      <div class="result-metric">
-        <div class="label">Predicted Next Month</div>
-        <div class="value" id="predValue" style="color: var(--accent);"></div>
-        <div class="sub">USD / tonne</div>
+    <!-- ------------------------------------------------------------------
+         SCREEN 2: FREIGHT FORECAST ENGINE (#forecast)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container" id="screen-forecast">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">Freight Forecast & Explainability Engine</h2>
+          <p class="screen-subtitle">Execute production Model v3 predictions with closed-form mathematical driver attribution.</p>
+        </div>
       </div>
-      <div class="result-metric">
-        <div class="label">Current Rate</div>
-        <div class="value" id="currValue"></div>
-        <div class="sub">USD / tonne</div>
-      </div>
-      <div class="result-metric">
-        <div class="label">Forecast Change</div>
-        <div class="value" id="changeValue"></div>
-        <div class="sub" id="riskLevel"></div>
+
+      <div class="grid-12">
+        <!-- Left: Configuration Form (7 cols) -->
+        <div class="col-6">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">tune</span>
+                Forecast Parameters
+              </span>
+              <button class="btn-secondary" id="fc-btn-autofill" style="font-size:0.75rem;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:16px;">sync</span>
+                Auto-fill Latest
+              </button>
+            </div>
+
+            <form id="forecast-form">
+              <div class="form-group">
+                <label class="form-label">Canonical Trade Lane</label>
+                <select class="form-control" id="fc-lane-select">
+                  <!-- Injected via JS -->
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Current Freight Rate (USD/tonne)</label>
+                <input type="number" step="0.01" class="form-control" id="fc-current-freight" required />
+              </div>
+
+              <div class="grid-2" style="margin-bottom:0;">
+                <div class="form-group">
+                  <label class="form-label">Baltic Dry Index (BDI)</label>
+                  <input type="number" class="form-control" id="fc-bdi" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">VLSFO Bunker ($/t)</label>
+                  <input type="number" step="0.1" class="form-control" id="fc-vlsfo" required />
+                </div>
+              </div>
+
+              <div class="grid-2" style="margin-bottom:0;">
+                <div class="form-group">
+                  <label class="form-label">Coal Benchmark ($/MT)</label>
+                  <input type="number" step="0.1" class="form-control" id="fc-coal" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Iron Ore Benchmark ($/dmt)</label>
+                  <input type="number" step="0.1" class="form-control" id="fc-iron-ore" required />
+                </div>
+              </div>
+
+              <div class="grid-4" style="margin-bottom:16px;">
+                <div class="form-group">
+                  <label class="form-label">Wind (km/h)</label>
+                  <input type="number" step="0.1" class="form-control" id="fc-wind" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Wave (m)</label>
+                  <input type="number" step="0.1" class="form-control" id="fc-wave" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Cyclone (0-5)</label>
+                  <input type="number" step="0.1" min="0" max="5" class="form-control" id="fc-cyclone" required />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Delay (days)</label>
+                  <input type="number" step="0.1" class="form-control" id="fc-delay" required />
+                </div>
+              </div>
+
+              <button type="submit" class="btn-primary" id="fc-btn-submit" style="width:100%;">
+                <span class="material-symbols-outlined">analytics</span>
+                Generate Model v3 Forecast
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Right: Forecast Results & Explainability (5 cols) -->
+        <div class="col-6">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">insights</span>
+                Next-Month Forecast Result
+              </span>
+              <span class="risk-badge" id="fc-res-risk">LOW RISK</span>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;">
+              <div>
+                <small style="color:var(--text-muted);text-transform:uppercase;font-size:0.7rem;font-weight:600;">Projected Rate</small>
+                <div class="kpi-value" id="fc-res-forecast" style="font-size:2.2rem;color:var(--primary);">$0.00</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="trend-pill" id="fc-res-change">0.00% vs Current</span>
+                <div style="margin-top:6px;">
+                  <span class="reco-badge" id="fc-res-reco">MONITOR</span>
+                </div>
+              </div>
+            </div>
+
+            <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.4;margin-bottom:16px;background:var(--surface-lowest);padding:12px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);" id="fc-res-reason">
+              Awaiting forecast generation...
+            </p>
+          </div>
+
+          <!-- Explainability Waterfall Card -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">psychology</span>
+                Exact Linear Feature Contributions (USD/t)
+              </span>
+            </div>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;" id="fc-expl-summary">
+              Contributions derived directly from Model v3 Ridge pipeline coefficients.
+            </p>
+            <div id="fc-expl-waterfall">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="card result-card" id="sourcesCard">
-    <h2>Data Provenance</h2>
-    <div class="sources-grid" id="sourcesGrid"></div>
-  </div>
+    <!-- ------------------------------------------------------------------
+         SCREEN 3: WHAT-IF SCENARIO SIMULATION (#scenario)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container" id="screen-scenario">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">What-If Scenario Simulation</h2>
+          <p class="screen-subtitle">Simulate market shocks and sea state disruptions to observe forecast sensitivity.</p>
+        </div>
+        <button class="btn-secondary" id="sc-btn-reset">
+          <span class="material-symbols-outlined">restart_alt</span>
+          Reset Shocks
+        </button>
+      </div>
 
-  <footer>
-    Powered by freight_forecast_model_final (HistGradientBoosting) · 13 features · No cargo_tonnes
-  </footer>
+      <div class="grid-12">
+        <!-- Left: Shock Sliders (6 cols) -->
+        <div class="col-6">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">tune</span>
+                Simulated Shocks & Perturbations
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Trade Corridor</label>
+              <select class="form-control" id="sc-lane-select">
+                <!-- Injected via JS -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <label class="form-label">VLSFO Bunker Shock (%)</label>
+                <span class="slider-val-badge" id="sc-badge-vlsfo">0%</span>
+              </div>
+              <input type="range" min="-50" max="100" step="5" value="0" class="range-slider" id="sc-slider-vlsfo" />
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <label class="form-label">Baltic Dry Index Shock (%)</label>
+                <span class="slider-val-badge" id="sc-badge-bdi">0%</span>
+              </div>
+              <input type="range" min="-50" max="100" step="5" value="0" class="range-slider" id="sc-slider-bdi" />
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <label class="form-label">Cyclone Risk Increase (Points)</label>
+                <span class="slider-val-badge" id="sc-badge-cyclone">0 pts</span>
+              </div>
+              <input type="range" min="0" max="4" step="1" value="0" class="range-slider" id="sc-slider-cyclone" />
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <label class="form-label">Weather Delay Shock (%)</label>
+                <span class="slider-val-badge" id="sc-badge-delay">0%</span>
+              </div>
+              <input type="range" min="0" max="200" step="25" value="0" class="range-slider" id="sc-slider-delay" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Baseline vs Scenario Comparative (6 cols) -->
+        <div class="col-6">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">compare_arrows</span>
+                Comparative Scenario Impact
+              </span>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:16px;">
+              <div style="background:var(--surface-lowest);padding:16px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);">
+                <small style="color:var(--text-muted);text-transform:uppercase;font-size:0.7rem;">Baseline Forecast</small>
+                <div class="kpi-value" id="sc-base-val">$0.00</div>
+              </div>
+              <div style="background:var(--surface-lowest);padding:16px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);">
+                <small style="color:var(--text-muted);text-transform:uppercase;font-size:0.7rem;">Simulated Forecast</small>
+                <div class="kpi-value" id="sc-sim-val" style="color:var(--primary);">$0.00</div>
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px;padding:12px;background:var(--surface-card-hover);border-radius:var(--radius-md);border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-weight:600;font-size:0.85rem;">Scenario Rate Delta:</span>
+                <span class="trend-pill" id="sc-diff-val">$0.00/t</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-secondary);margin-top:6px;">
+                <span>Risk Transition: <strong id="sc-risk-shift">LOW (unchanged)</strong></span>
+                <span>Action: <strong id="sc-reco-shift">MONITOR (unchanged)</strong></span>
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <small style="color:var(--text-muted);text-transform:uppercase;font-size:0.7rem;font-weight:600;">Scenario Summary</small>
+              <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px;" id="sc-summary">
+                Simulating baseline conditions.
+              </p>
+            </div>
+
+            <div>
+              <small style="color:var(--text-muted);text-transform:uppercase;font-size:0.7rem;font-weight:600;">Active Modifications</small>
+              <div id="sc-changes-list" style="margin-top:6px;">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------
+         SCREEN 4: ROUTE INTELLIGENCE (#routes)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container" id="screen-routes">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">Route Intelligence & Historical Benchmarks</h2>
+          <p class="screen-subtitle">Longitudinal analytics across all five canonical dry bulk shipping corridors.</p>
+        </div>
+      </div>
+
+      <div class="grid-12">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">table_chart</span>
+                Canonical Trade Corridors (22 Months: Feb 2024 – Nov 2025)
+              </span>
+            </div>
+            <div class="data-table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Trade Corridor</th>
+                    <th>Latest Spot</th>
+                    <th>22M Average</th>
+                    <th>Historical Range</th>
+                    <th>MoM Change</th>
+                    <th>Trajectory</th>
+                  </tr>
+                </thead>
+                <tbody id="ri-routes-tbody">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">show_chart</span>
+                Chronological Freight Rate Trend (Selected Route)
+              </span>
+            </div>
+            <div id="ri-trends-chart" style="width:100%;height:260px;">
+              <!-- Injected SVG Chart -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------
+         SCREEN 5: MARKET INTELLIGENCE (#market)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container" id="screen-market">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">Market Intelligence & Macro Trends</h2>
+          <p class="screen-subtitle">Multi-scale macroeconomic indicators, fuel prices, and historical correlations.</p>
+        </div>
+      </div>
+
+      <div class="grid-12">
+        <div class="col-8">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">stacked_line_chart</span>
+                Macro Co-Movement: BDI (Blue) vs VLSFO (Gold) vs Freight (Purple)
+              </span>
+            </div>
+            <div id="mi-macro-chart" style="width:100%;height:300px;">
+              <!-- Injected Multi-Series SVG -->
+            </div>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">bubble_chart</span>
+                Pearson Correlation Rankings
+              </span>
+            </div>
+            <div style="background:var(--warning-bg);border:1px solid var(--warning-border);padding:8px 12px;border-radius:var(--radius-sm);font-size:0.72rem;color:var(--warning);font-weight:600;margin-bottom:14px;">
+              HISTORICAL CORRELATION — NON-CAUSAL
+            </div>
+            <div id="mi-correlations-chart">
+              <!-- Injected Correlation bars -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------
+         SCREEN 6: WEATHER INTELLIGENCE (#weather)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container" id="screen-weather">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">Weather Intelligence & Maritime Risk</h2>
+          <p class="screen-subtitle">Operational sea state monitoring across origin loading ports with 24-hour freshness tracking.</p>
+        </div>
+      </div>
+
+      <div class="grid-12" id="wi-ports-grid">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------------------
+         SCREEN 7: DATA & SOURCES PROVENANCE (#sources)
+         ------------------------------------------------------------------ -->
+    <div class="screen-container" id="screen-sources">
+      <div class="screen-header">
+        <div>
+          <h2 class="screen-title">Data Provenance & Model Specifications</h2>
+          <p class="screen-subtitle">Institutional compliance, training provenance, and empirical validation benchmarks.</p>
+        </div>
+      </div>
+
+      <div class="grid-12">
+        <div class="col-6">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">verified_user</span>
+                Active Production Model
+              </span>
+            </div>
+            <table class="data-table">
+              <tbody>
+                <tr>
+                  <td>Model Identifier</td>
+                  <td style="font-family:var(--font-mono);font-weight:600;" id="ds-model-name">freight_forecast_model_v3</td>
+                </tr>
+                <tr>
+                  <td>Algorithm</td>
+                  <td id="ds-model-algo">Bounded Residual Ridge Regression</td>
+                </tr>
+                <tr>
+                  <td>Regularization (Alpha)</td>
+                  <td style="font-family:var(--font-mono);" id="ds-model-alpha">10.0</td>
+                </tr>
+                <tr>
+                  <td>Input Feature Contract</td>
+                  <td style="font-family:var(--font-mono);" id="ds-model-features">13 Features (NO cargo_tonnes)</td>
+                </tr>
+                <tr>
+                  <td>Residual Guardrail</td>
+                  <td style="font-family:var(--font-mono);">[-4.0, +4.0] USD/tonne</td>
+                </tr>
+                <tr>
+                  <td>Physical Level Floor</td>
+                  <td style="font-family:var(--font-mono);">&gt;= 1.00 USD/tonne</td>
+                </tr>
+                <tr>
+                  <td>Model SHA-256 Checksum</td>
+                  <td style="font-family:var(--font-mono);font-size:0.72rem;word-break:break-all;">71fbb870bb1f555d73a51ed7d83fb5a877cc4405ce54d1fe18407c9ce37c46a8</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">folder</span>
+                Dataset Lineage & Validation Evidence
+              </span>
+            </div>
+            <table class="data-table">
+              <tbody>
+                <tr>
+                  <td>Primary Training Dataset</td>
+                  <td style="font-family:var(--font-mono);" id="ds-dataset-name">master_freight_training_expanded_v1.csv</td>
+                </tr>
+                <tr>
+                  <td>Training Observations</td>
+                  <td id="ds-dataset-obs">110 Genuine Records (2024-02-01 to 2025-11-01)</td>
+                </tr>
+                <tr>
+                  <td>Synthetic Dataset Status</td>
+                  <td><span class="risk-badge risk-low">QUARANTINED / NOT USED</span></td>
+                </tr>
+                <tr>
+                  <td>Holdout Out-of-Sample MAE</td>
+                  <td style="font-family:var(--font-mono);font-weight:700;color:var(--success);">0.4730 USD/tonne</td>
+                </tr>
+                <tr>
+                  <td>Persistence Baseline MAE</td>
+                  <td style="font-family:var(--font-mono);">0.8280 USD/tonne</td>
+                </tr>
+                <tr>
+                  <td>Directional Accuracy</td>
+                  <td style="font-family:var(--font-mono);font-weight:700;color:var(--primary);">60.0%</td>
+                </tr>
+                <tr>
+                  <td>Database Storage Engine</td>
+                  <td>SQLite (WAL Journal Mode)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Telemetry Table (12 cols) -->
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <span class="material-symbols-outlined icon">history</span>
+                Live Prediction Audit Log (Telemetry)
+              </span>
+            </div>
+            <div class="data-table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp (UTC)</th>
+                    <th>Corridor</th>
+                    <th>Commodity</th>
+                    <th>Current Spot</th>
+                    <th>Model Forecast</th>
+                    <th>Risk Band</th>
+                  </tr>
+                </thead>
+                <tbody id="ds-telemetry-tbody">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
 </div>
 
-<script>
-// Detect if we're behind the gateway (XTransformPort in URL) and preserve it
-const urlParams = new URLSearchParams(window.location.search);
-const _xtp = urlParams.get('XTransformPort');
-const API = _xtp ? `?XTransformPort=${_xtp}` : '';
-// Helper to append XTransformPort to any API path
-function apiUrl(path) {
-  return _xtp ? `${path}?XTransformPort=${_xtp}` : path;
-}
-
-async function checkStatus() {
-  try {
-    const r = await fetch(apiUrl('/health'));
-    if (r.ok) document.getElementById('dotApi').classList.remove('off');
-  } catch(e) {}
-  try {
-    const r = await fetch(apiUrl('/data/status'));
-    const d = await r.json();
-    if (d.weather) document.getElementById('dotWeather').classList.remove('off');
-    if (d.market) document.getElementById('dotMarket').classList.remove('off');
-  } catch(e) {}
-}
-
-async function predict() {
-  const btn = document.getElementById('predictBtn');
-  const errEl = document.getElementById('errorMsg');
-  const resultCard = document.getElementById('resultCard');
-  const sourcesCard = document.getElementById('sourcesCard');
-  btn.disabled = true; btn.textContent = 'Forecasting...';
-  errEl.classList.remove('show'); resultCard.classList.remove('show'); sourcesCard.classList.remove('show');
-
-  const payload = {
-    origin: document.getElementById('origin').value,
-    destination: document.getElementById('destination').value,
-    commodity: document.getElementById('commodity').value,
-    vessel_type: document.getElementById('vessel_type').value,
-    current_freight_usd_per_tonne: parseFloat(document.getElementById('current_freight').value),
-  };
-  // optional fields — only include if user entered a value
-  const optFields = [
-    ['bdi', 'bdi'], ['vlsfo', 'vlsfo_usd_per_tonne'],
-    ['coal_price', 'coal_price_usd_per_mt'], ['iron_ore', 'iron_ore_price_usd_per_dmt'],
-    ['wind_kmh', 'wind_kmh'], ['wave_height', 'wave_height_m'],
-    ['cyclone_risk', 'cyclone_risk'], ['weather_delay', 'weather_delay_days'],
-  ];
-  for (const [id, key] of optFields) {
-    const v = document.getElementById(id).value;
-    if (v !== '') payload[key] = parseFloat(v);
-  }
-
-  try {
-    const r = await fetch(apiUrl('/predict'), {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      errEl.textContent = 'Error ' + r.status + ': ' + (data.detail || JSON.stringify(data));
-      errEl.classList.add('show');
-      return;
-    }
-    // Display results
-    document.getElementById('predValue').textContent = data.predicted_next_month_freight_usd_per_tonne.toFixed(2);
-    document.getElementById('currValue').textContent = data.current_freight_usd_per_tonne.toFixed(2);
-    const chg = data.forecast_change_percent;
-    const chgEl = document.getElementById('changeValue');
-    chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
-    chgEl.style.color = chg >= 5 ? 'var(--red)' : chg <= -5 ? 'var(--green)' : 'var(--amber)';
-    document.getElementById('riskLevel').textContent = 'Risk: ' + data.risk_level;
-
-    const banner = document.getElementById('recoBanner');
-    banner.textContent = data.recommendation;
-    banner.className = 'reco-banner reco-' + data.recommendation.split(' ')[0];
-    document.getElementById('reasonText').textContent = data.reason;
-
-    // Sources
-    const sg = document.getElementById('sourcesGrid');
-    sg.innerHTML = '';
-    for (const [field, prov] of Object.entries(data.sources)) {
-      const div = document.createElement('div');
-      div.className = 'src';
-      div.innerHTML = '<span class="field">' + field + '</span><span class="prov">' + prov + '</span>';
-      sg.appendChild(div);
-    }
-    resultCard.classList.add('show');
-    sourcesCard.classList.add('show');
-  } catch(e) {
-    errEl.textContent = 'Network error: ' + e.message;
-    errEl.classList.add('show');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Forecast Next-Month Rate →';
-  }
-}
-
-checkStatus();
-</script>
+<!-- Main Application ES Module -->
+<script type="module" src="/static/js/app.js"></script>
 </body>
 </html>
