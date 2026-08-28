@@ -1,0 +1,26 @@
+date,origin,destination,commodity,vessel_type,current_freight_usd_per_tonne,actual_next_month_freight,predicted_next_month_freight,absolute_error
+2025-07-01,Australia West Coast,East Coast India,Iron Ore,Capesize,10.7,10.0,10.073840028490029,0.07384002849002869
+2025-07-01,Hay Point,East Coast India,Coal,Capesize,14.2,13.4,13.290729497354501,0.10927050264549898
+2025-07-01,Hay Point,East Coast India,Coal,Panamax,16.8,16.0,15.948247089947111,0.05175291005288862
+2025-07-01,Taboneo,East Coast India,Thermal Coal,Panamax,10.1,9.5,9.87234889092389,0.3723488909238899
+2025-07-01,Taboneo,East Coast India,Thermal Coal,Supramax,11.9,11.2,11.231798758648772,0.03179875864877246
+2025-08-01,Australia West Coast,East Coast India,Iron Ore,Capesize,10.0,10.3,9.850122832722834,0.4498771672771671
+2025-08-01,Hay Point,East Coast India,Coal,Capesize,13.4,13.8,12.554788095238104,1.2452119047618968
+2025-08-01,Hay Point,East Coast India,Coal,Panamax,16.0,16.4,15.224924074074085,1.1750759259259134
+2025-08-01,Taboneo,East Coast India,Thermal Coal,Panamax,9.5,9.7,9.135969790394789,0.5640302096052103
+2025-08-01,Taboneo,East Coast India,Thermal Coal,Supramax,11.2,11.5,10.419795054945057,1.080204945054943
+2025-09-01,Australia West Coast,East Coast India,Iron Ore,Capesize,10.3,12.2,10.670892017242018,1.5291079827579814
+2025-09-01,Hay Point,East Coast India,Coal,Capesize,13.8,16.4,13.584747486772494,2.815252513227504
+2025-09-01,Hay Point,East Coast India,Coal,Panamax,16.4,19.1,16.008336772486775,3.0916632275132265
+2025-09-01,Taboneo,East Coast India,Thermal Coal,Panamax,9.7,11.2,10.06124280626781,1.1387571937321894
+2025-09-01,Taboneo,East Coast India,Thermal Coal,Supramax,11.5,13.1,11.095277863802863,2.0047221361971364
+2025-10-01,Australia West Coast,East Coast India,Iron Ore,Capesize,12.2,12.9,11.803233852258858,1.0967661477411426
+2025-10-01,Hay Point,East Coast India,Coal,Capesize,16.4,17.2,15.175463095238095,2.024536904761904
+2025-10-01,Hay Point,East Coast India,Coal,Panamax,19.1,20.0,17.484669841269845,2.515330158730155
+2025-10-01,Taboneo,East Coast India,Thermal Coal,Panamax,11.2,11.8,10.87454307081807,0.9254569291819301
+2025-10-01,Taboneo,East Coast India,Thermal Coal,Supramax,13.1,13.8,12.639551455026462,1.1604485449735389
+2025-11-01,Australia West Coast,East Coast India,Iron Ore,Capesize,12.9,13.1,11.62712203907204,1.4728779609279599
+2025-11-01,Hay Point,East Coast India,Coal,Capesize,17.2,17.5,15.733299206349205,1.766700793650795
+2025-11-01,Hay Point,East Coast India,Coal,Panamax,20.0,20.3,18.001739682539675,2.2982603174603256
+2025-11-01,Taboneo,East Coast India,Thermal Coal,Panamax,11.8,12.1,10.830466880341879,1.2695331196581208
+2025-11-01,Taboneo,East Coast India,Thermal Coal,Supramax,13.8,14.2,12.411945238095251,1.788054761904748
