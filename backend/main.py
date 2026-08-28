@@ -1,4 +1,4 @@
-"""FastAPI application exposing Model v3 freight forecasting and scenario simulation.
+"""FastAPI application exposing Model v3 forecasting, scenario simulation, and market intelligence.
 
 Run locally:
     cd backend
@@ -12,8 +12,9 @@ Frontend UI:      http://localhost:8000/
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,16 +28,24 @@ if str(_BACKEND_ROOT) not in sys.path:
 from data import database
 from predict import FEATURES, get_model, get_model_metadata, MODEL_PATH
 from schemas import (
+    CorrelationsResponse,
     DataStatus,
     ErrorResponse,
+    ExecutiveSummaryResponse,
     FreightRequest,
     FreightResponse,
+    FreightTrendsResponse,
     LatestData,
+    LatestMarketSnapshotResponse,
     MarketQuoteOut,
+    MarketTrendsResponse,
+    RoutesResponse,
     ScenarioRequest,
     ScenarioResponse,
     WeatherSnapshot,
+    WeatherTrendsResponse,
 )
+from services import analytics_service
 from services.forecast_service import (
     ForecastDataError,
     forecast,
@@ -55,11 +64,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Freight Forecasting API (Model v3)",
+    title="Freight Forecasting & Market Intelligence API (Model v3)",
     description=(
-        "Production inference & what-if scenario API for Model v3 (Bounded Residual Ridge Regression). "
-        "Forecasts next-month dry bulk ocean freight rates (USD/tonne) and generates "
-        "weather-risk based chartering recommendations with closed-form mathematical explainability."
+        "Production inference, what-if scenario simulation, and market intelligence API for dry bulk ocean freight. "
+        "Forecasts next-month rates (USD/tonne) with closed-form mathematical explainability and provides "
+        "comprehensive historical market trends and correlations."
     ),
     version="3.0.0",
     lifespan=lifespan,
@@ -91,7 +100,7 @@ def model_info():
 
 
 # --------------------------------------------------------------------------- #
-# Data status & latest values
+# Data status & latest values (Live DB Cache)
 # --------------------------------------------------------------------------- #
 @app.get("/data/status", response_model=DataStatus)
 def data_status():
@@ -242,6 +251,93 @@ def predict_scenario(req: ScenarioRequest):
                 "detail": str(exc),
             },
         )
+
+
+# --------------------------------------------------------------------------- #
+# Market Intelligence & Historical Analytics (Phase 3)
+# --------------------------------------------------------------------------- #
+@app.get(
+    "/analytics/freight-trends",
+    response_model=FreightTrendsResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def get_freight_trends(
+    origin: Optional[str] = Query(None, description="Filter by loading port/region"),
+    destination: Optional[str] = Query(None, description="Filter by discharge port/region"),
+    commodity: Optional[str] = Query(None, description="Filter by cargo commodity"),
+    vessel_type: Optional[str] = Query(None, description="Filter by vessel class"),
+):
+    """Retrieve chronological historical freight rates with MoM change and 3-month rolling averages."""
+    try:
+        return analytics_service.get_freight_trends(
+            origin=origin,
+            destination=destination,
+            commodity=commodity,
+            vessel_type=vessel_type,
+        )
+    except ForecastDataError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "missing_fields": exc.missing_fields,
+                "detail": exc.detail,
+            },
+        )
+
+
+@app.get("/analytics/market-trends", response_model=MarketTrendsResponse)
+def get_market_trends():
+    """Retrieve historical monthly macroeconomic drivers (BDI, VLSFO, Coal, Iron Ore) and freight averages."""
+    return analytics_service.get_market_trends()
+
+
+@app.get(
+    "/analytics/weather-trends",
+    response_model=WeatherTrendsResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def get_weather_trends(
+    origin: Optional[str] = Query(None, description="Filter weather series by origin port"),
+):
+    """Retrieve historical weather observations (wind, waves, cyclone risk, delays) by port."""
+    try:
+        return analytics_service.get_weather_trends(origin=origin)
+    except ForecastDataError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "missing_fields": exc.missing_fields,
+                "detail": exc.detail,
+            },
+        )
+
+
+@app.get("/analytics/routes", response_model=RoutesResponse)
+def get_routes_analytics():
+    """Retrieve key statistics and trend classifications across canonical trade lanes."""
+    return analytics_service.get_routes_analytics()
+
+
+@app.get("/analytics/summary", response_model=ExecutiveSummaryResponse)
+def get_executive_summary():
+    """Retrieve high-level executive snapshot of latest market state, momentum, and top route movers."""
+    return analytics_service.get_executive_summary()
+
+
+@app.get("/analytics/correlations", response_model=CorrelationsResponse)
+def get_correlations():
+    """Retrieve Pearson correlation coefficients of freight against market and weather drivers."""
+    return analytics_service.get_correlations()
+
+
+@app.get("/analytics/latest", response_model=LatestMarketSnapshotResponse)
+def get_latest_market_snapshot():
+    """Retrieve comprehensive snapshot of latest available historical data and database cache status."""
+    return analytics_service.get_latest_market_snapshot()
 
 
 @app.get("/data/telemetry")

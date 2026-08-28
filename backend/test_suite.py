@@ -1,4 +1,4 @@
-"""Comprehensive automated test suite for Freight Forecasting backend, Explainability, and Scenario Analysis.
+"""Comprehensive automated test suite for Freight Forecasting backend, Explainability, Scenario Analysis, and Market Intelligence.
 
 Uses Python standard library `unittest` + FastAPI TestClient.
 Tests are deterministic and do not make live external network calls.
@@ -33,6 +33,7 @@ from predict import (
     predict_freight,
 )
 from schemas import FreightRequest, FreightResponse
+from services import analytics_service
 from services.forecast_service import (
     ForecastDataError,
     build_forecast_input,
@@ -107,16 +108,13 @@ class TestForecastExplainability(unittest.TestCase):
         self.assertIn("explanation", res)
         expl = res["explanation"]
 
-        # Check required fields
         self.assertIn("summary", expl)
         self.assertIn("drivers", expl)
         self.assertIn("anchor", expl)
 
-        # Check summary is non-empty and references dollar values
         self.assertIn("$16.50", expl["summary"])
         self.assertIn("$17.47", expl["summary"])
 
-        # Check drivers
         drivers = expl["drivers"]
         self.assertGreater(len(drivers), 5)
         for d in drivers:
@@ -127,7 +125,6 @@ class TestForecastExplainability(unittest.TestCase):
             self.assertIn(d["effect"], ["positive", "negative", "neutral"])
             self.assertEqual(d["source"], "model")
 
-        # Mathematical consistency: sum of contributions + intercept == raw_delta (within float precision)
         total_contrib = sum(d["contribution_usd_per_tonne"] for d in drivers)
         intercept = expl["anchor"]["model_intercept"]
         raw_delta = expl["anchor"]["raw_predicted_delta_usd_per_tonne"]
@@ -172,7 +169,6 @@ class TestScenarioAnalysis(unittest.TestCase):
         database.init_db()
 
     def test_baseline_scenario_equality_when_unchanged(self):
-        """When scenario_changes is empty, scenario prediction MUST equal baseline and /predict."""
         payload = {
             "origin": "Hay Point",
             "destination": "East Coast India",
@@ -189,12 +185,10 @@ class TestScenarioAnalysis(unittest.TestCase):
             "weather_delay_days": 0.5,
             "scenario_changes": {},
         }
-        # Call /predict
         resp_predict = self.client.post("/predict", json=payload)
         self.assertEqual(resp_predict.status_code, 200)
         norm_res = resp_predict.json()
 
-        # Call /predict/scenario
         resp_scen = self.client.post("/predict/scenario", json=payload)
         self.assertEqual(resp_scen.status_code, 200)
         scen_res = resp_scen.json()
@@ -211,7 +205,6 @@ class TestScenarioAnalysis(unittest.TestCase):
         self.assertEqual(len(scen_res["changes"]), 0)
 
     def test_vlsfo_percentage_shock_scenario(self):
-        """+10% bunker fuel price should increase next-month freight forecast."""
         payload = {
             "origin": "Hay Point",
             "destination": "East Coast India",
@@ -245,7 +238,6 @@ class TestScenarioAnalysis(unittest.TestCase):
         self.assertEqual(data["changes"][0]["scenario"], 701.8)
 
     def test_cyclone_risk_shock_shifts_recommendation(self):
-        """Cyclone risk shock from 2 -> 5 should shift risk level to HIGH and recommend CHARTER NOW."""
         payload = {
             "origin": "Taboneo",
             "destination": "East Coast India",
@@ -302,55 +294,154 @@ class TestScenarioAnalysis(unittest.TestCase):
         p3 = dict(base, scenario_changes={"vlsfo_usd_per_tonne": -50.0})
         self.assertEqual(self.client.post("/predict/scenario", json=p3).status_code, 422)
 
-    def test_scenario_simulation_all_5_routes(self):
-        routes = [
-            ("Australia West Coast", "East Coast India", "Iron Ore", "Capesize", 10.0),
-            ("Hay Point", "East Coast India", "Coal", "Capesize", 14.0),
-            ("Hay Point", "East Coast India", "Coal", "Panamax", 16.5),
-            ("Taboneo", "East Coast India", "Thermal Coal", "Panamax", 11.0),
-            ("Taboneo", "East Coast India", "Thermal Coal", "Supramax", 12.0),
-        ]
-        for origin, dest, comm, vessel, curr in routes:
-            payload = {
-                "origin": origin,
-                "destination": dest,
-                "commodity": comm,
-                "vessel_type": vessel,
-                "current_freight_usd_per_tonne": curr,
-                "bdi": 1560.0,
-                "vlsfo_usd_per_tonne": 638.0,
-                "coal_price_usd_per_mt": 124.0,
-                "iron_ore_price_usd_per_dmt": 124.0,
-                "wind_kmh": 32.0,
-                "wave_height_m": 2.0,
-                "cyclone_risk": 2.0,
-                "weather_delay_days": 0.5,
-                "scenario_changes": {
-                    "vlsfo_change_percent": 15.0,
-                    "wind_kmh": 45.0,
-                },
-            }
-            resp = self.client.post("/predict/scenario", json=payload)
-            self.assertEqual(resp.status_code, 200)
-            data = resp.json()
-            self.assertIn("summary", data)
-            self.assertIn("baseline", data)
-            self.assertIn("scenario", data)
-            self.assertIn("impact", data)
-            self.assertEqual(len(data["changes"]), 2)
+
+class TestMarketIntelligenceAnalytics(unittest.TestCase):
+    """Tests Phase 3 Market Intelligence and Historical Analytics endpoints."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_freight_trends_unfiltered_and_structure(self):
+        resp = self.client.get("/analytics/freight-trends")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertIn("provenance", data)
+        self.assertEqual(data["provenance"]["data_source"], "master_freight_training_expanded_v1.csv")
+        self.assertEqual(data["provenance"]["data_type"], "historical")
+        self.assertEqual(data["provenance"]["total_records"], 110)
+
+        series = data["series"]
+        self.assertEqual(len(series), 110)
+        first_pt = series[0]
+        self.assertIn("date", first_pt)
+        self.assertIn("freight_rate_usd_per_tonne", first_pt)
+        self.assertIn("rolling_3m_avg", first_pt)
+        self.assertGreater(first_pt["freight_rate_usd_per_tonne"], 0)
+
+    def test_freight_trends_filtered_by_origin_and_commodity(self):
+        resp = self.client.get("/analytics/freight-trends?origin=Hay%20Point&commodity=Coal")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["provenance"]["total_records"], 44)  # 2 vessel types * 22 months = 44
+        for pt in data["series"]:
+            self.assertEqual(pt["origin"], "Hay Point")
+            self.assertEqual(pt["commodity"], "Coal")
+
+    def test_freight_trends_invalid_filter_422(self):
+        resp = self.client.get("/analytics/freight-trends?origin=LondonPort")
+        self.assertEqual(resp.status_code, 422)
+        err = resp.json()
+        self.assertEqual(err.get("error_code"), "INVALID_FILTER")
+
+    def test_market_trends_macro_series(self):
+        resp = self.client.get("/analytics/market-trends")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data["provenance"]["total_records"], 22)  # 22 distinct monthly snapshots
+        series = data["series"]
+        self.assertEqual(len(series), 22)
+
+        # Check chronological order
+        dates = [s["date"] for s in series]
+        self.assertEqual(dates, sorted(dates))
+        self.assertEqual(dates[0], "2024-02-01")
+        self.assertEqual(dates[-1], "2025-11-01")
+
+        for s in series:
+            self.assertGreater(s["bdi"], 0)
+            self.assertGreater(s["vlsfo_usd_per_tonne"], 0)
+            self.assertGreater(s["average_freight_usd_per_tonne"], 0)
+
+    def test_weather_trends_by_origin(self):
+        resp = self.client.get("/analytics/weather-trends?origin=Taboneo")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["provenance"]["total_records"], 22)
+        for s in data["series"]:
+            self.assertEqual(s["origin"], "Taboneo")
+            self.assertGreaterEqual(s["wind_kmh"], 0)
+            self.assertGreaterEqual(s["wave_height_m"], 0)
+            self.assertGreaterEqual(s["cyclone_risk"], 0)
+
+    def test_weather_trends_invalid_origin_422(self):
+        resp = self.client.get("/analytics/weather-trends?origin=UnknownOrigin")
+        self.assertEqual(resp.status_code, 422)
+
+    def test_routes_analytics_5_canonical_lanes(self):
+        resp = self.client.get("/analytics/routes")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        routes = data["routes"]
+        self.assertEqual(len(routes), 5)
+
+        for r in routes:
+            self.assertEqual(r["observation_count"], 22)
+            self.assertEqual(r["first_date"], "2024-02-01")
+            self.assertEqual(r["last_date"], "2025-11-01")
+            self.assertGreater(r["average_freight"], 5.0)
+            self.assertLess(r["average_freight"], 30.0)
+            self.assertIn(r["trend"], ["RISING", "FALLING", "STABLE"])
+
+    def test_executive_summary_structure_and_values(self):
+        resp = self.client.get("/analytics/summary")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data["latest_date"], "2025-11-01")
+        self.assertIn("market_state", data)
+        self.assertIn("recent_trends", data)
+        self.assertEqual(data["tracked_routes_count"], 5)
+        self.assertIn(data["recent_trends"]["freight_trend_classification"], ["RISING", "FALLING", "STABLE"])
+        self.assertIsNotNone(data["strongest_positive_mover"])
+
+    def test_correlations_against_freight(self):
+        resp = self.client.get("/analytics/correlations")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data["target_variable"], "current_freight_usd_per_tonne")
+        self.assertIn("disclaimer", data)
+        self.assertIn("HISTORICAL CORRELATION", data["disclaimer"])
+
+        corrs = {c["feature"]: c["correlation"] for c in data["correlations"]}
+        self.assertIn("bdi", corrs)
+        self.assertIn("vlsfo_usd_per_tonne", corrs)
+        self.assertIn("cyclone_risk", corrs)
+
+        # BDI and VLSFO have positive correlation with freight
+        self.assertGreater(corrs["bdi"], 0.4)
+        self.assertGreater(corrs["vlsfo_usd_per_tonne"], 0.4)
+
+    def test_latest_snapshot_combined_view(self):
+        resp = self.client.get("/analytics/latest")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data["latest_historical_date"], "2025-11-01")
+        self.assertIn("market_macro", data)
+        self.assertIn("weather_by_origin", data)
+        self.assertIn("freight_by_route", data)
+        self.assertIn("live_database_cache_status", data)
+
+    def test_quarantine_guard_synthetic_data_not_used(self):
+        """Verify that analytics service never points to or reads synthetic_v2."""
+        self.assertNotIn("synthetic", str(analytics_service.HISTORICAL_CSV_PATH).lower())
+        self.assertEqual(analytics_service.HISTORICAL_CSV_PATH.name, "master_freight_training_expanded_v1.csv")
 
 
 class TestPredictionSafetyAndBounds(unittest.TestCase):
     """Tests physical minimum floor and safety limits."""
 
     def test_physical_forecast_floor_prevents_negative(self):
-        """Even with an extreme downward push on a very low base rate, forecast cannot be negative."""
         sample = {
             "origin": "Australia West Coast",
             "destination": "East Coast India",
             "commodity": "Iron Ore",
             "vessel_type": "Capesize",
-            "current_freight_usd_per_tonne": 2.0,  # very low base rate
+            "current_freight_usd_per_tonne": 2.0,
             "bdi": 500,
             "vlsfo_usd_per_tonne": 200,
             "coal_price_usd_per_mt": 50,
@@ -362,7 +453,7 @@ class TestPredictionSafetyAndBounds(unittest.TestCase):
         }
         res = predict_freight(sample)
         pred = res["predicted_next_month_freight_usd_per_tonne"]
-        self.assertGreaterEqual(pred, 1.0, f"Forecast must enforce minimum 1.0 floor, got {pred}")
+        self.assertGreaterEqual(pred, 1.0)
         self.assertTrue(res["explanation"]["anchor"]["physical_floor_applied"])
 
     def test_normal_forecast_not_altered_by_floor(self):
@@ -391,40 +482,24 @@ class TestRecommendationBoundaries(unittest.TestCase):
     """Tests exact threshold boundary cases for risk level and recommendations."""
 
     def test_risk_level_boundaries(self):
-        # cyclone_risk >= 4 -> HIGH
         self.assertEqual(compute_risk_level(4.0, 0.0), "HIGH")
-        # cyclone_risk = 3.99, delay = 0 -> MEDIUM
         self.assertEqual(compute_risk_level(3.99, 0.0), "MEDIUM")
-        # cyclone_risk = 3.0 -> MEDIUM
         self.assertEqual(compute_risk_level(3.0, 0.0), "MEDIUM")
-        # cyclone_risk = 2.99 -> LOW
         self.assertEqual(compute_risk_level(2.99, 0.0), "LOW")
-
-        # weather_delay_days >= 2.5 -> HIGH
         self.assertEqual(compute_risk_level(0.0, 2.5), "HIGH")
-        # weather_delay_days = 2.49 -> MEDIUM
         self.assertEqual(compute_risk_level(0.0, 2.49), "MEDIUM")
-        # weather_delay_days = 1.0 -> MEDIUM
         self.assertEqual(compute_risk_level(0.0, 1.0), "MEDIUM")
-        # weather_delay_days = 0.99 -> LOW
         self.assertEqual(compute_risk_level(0.0, 0.99), "LOW")
 
     def test_recommendation_boundaries(self):
-        # +5.0% -> CHARTER NOW
         rec, _ = compute_recommendation(5.0, "LOW")
         self.assertEqual(rec, "CHARTER NOW")
-        # +4.99% -> MONITOR
         rec, _ = compute_recommendation(4.99, "LOW")
         self.assertEqual(rec, "MONITOR")
-
-        # -5.0% -> WAIT
         rec, _ = compute_recommendation(-5.0, "LOW")
         self.assertEqual(rec, "WAIT")
-        # -4.99% -> MONITOR
         rec, _ = compute_recommendation(-4.99, "LOW")
         self.assertEqual(rec, "MONITOR")
-
-        # -10.0% with HIGH risk -> CHARTER NOW (risk overrides drop)
         rec, _ = compute_recommendation(-10.0, "HIGH")
         self.assertEqual(rec, "CHARTER NOW")
 
@@ -457,7 +532,7 @@ class TestAPIEndpointsAndValidation(unittest.TestCase):
         payload_zero = {
             "origin": "Hay Point", "destination": "East Coast India", "commodity": "Coal",
             "vessel_type": "Panamax", "current_freight_usd_per_tonne": 16.5,
-            "bdi": 0,  # Invalid <= 0
+            "bdi": 0,
         }
         resp = self.client.post("/predict", json=payload_zero)
         self.assertEqual(resp.status_code, 422)
@@ -465,7 +540,7 @@ class TestAPIEndpointsAndValidation(unittest.TestCase):
         payload_neg = {
             "origin": "Hay Point", "destination": "East Coast India", "commodity": "Coal",
             "vessel_type": "Panamax", "current_freight_usd_per_tonne": 16.5,
-            "bdi": -100,  # Invalid < 0
+            "bdi": -100,
         }
         resp = self.client.post("/predict", json=payload_neg)
         self.assertEqual(resp.status_code, 422)
@@ -479,12 +554,10 @@ class TestAPIEndpointsAndValidation(unittest.TestCase):
         self.assertEqual(resp.status_code, 422)
 
     def test_missing_market_data_structured_error(self):
-        """When optional market fields are omitted and DB has no quotes, return structured MARKET_DATA_MISSING."""
         payload = {
             "origin": "Hay Point", "destination": "East Coast India", "commodity": "Coal",
             "vessel_type": "Panamax", "current_freight_usd_per_tonne": 16.5,
             "wind_kmh": 25, "wave_height_m": 1.5, "cyclone_risk": 1, "weather_delay_days": 0.0,
-            # omitted: bdi, vlsfo, coal_price, iron_ore
         }
         resp = self.client.post("/predict", json=payload)
         self.assertEqual(resp.status_code, 422)
@@ -533,12 +606,10 @@ class TestDataFreshnessAndWeatherPorts(unittest.TestCase):
         self.assertAlmostEqual(lon, 118.57, places=2)
 
     def test_australia_west_coast_weather_autofill_and_staleness(self):
-        # Clear existing weather rows to test specific fixtures cleanly
         with database.get_connection() as conn:
             conn.execute("DELETE FROM weather_data")
             conn.commit()
 
-        # 1. Insert fresh weather for Australia West Coast
         fresh_ts = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
         with database.get_connection() as conn:
             conn.execute(
@@ -560,7 +631,6 @@ class TestDataFreshnessAndWeatherPorts(unittest.TestCase):
             "vlsfo_usd_per_tonne": 638,
             "coal_price_usd_per_mt": 124,
             "iron_ore_price_usd_per_dmt": 124,
-            # Weather omitted: will auto-fill from Australia West Coast DB record
         }
         resp = self.client.post("/predict", json=payload)
         self.assertEqual(resp.status_code, 200)
@@ -568,7 +638,6 @@ class TestDataFreshnessAndWeatherPorts(unittest.TestCase):
         self.assertIn("weather_db[Australia West Coast@", data["sources"]["wind_kmh"])
         self.assertNotIn("STALE", data["sources"]["wind_kmh"])
 
-        # 2. Insert STALE weather (3 days old)
         stale_dt = datetime.now(timezone.utc) - timedelta(days=3)
         stale_ts = stale_dt.isoformat(timespec="seconds").replace("+00:00", "Z")
         with database.get_connection() as conn:

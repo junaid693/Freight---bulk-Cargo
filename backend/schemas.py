@@ -1,6 +1,6 @@
-"""Pydantic request/response schemas for the freight forecasting API."""
+"""Pydantic request/response schemas for the freight forecasting API and Market Intelligence."""
 
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -117,14 +117,7 @@ class PredictionExplanation(BaseModel):
 
 
 class FreightResponse(BaseModel):
-    """Forecast result returned by the /predict endpoint.
-
-    `sources` documents where each filled field came from ('user' or a
-    database reference with freshness metadata) so callers can see which inputs
-    were auto-filled.
-    `explanation` provides an exact mathematical and natural language breakdown
-    of model drivers.
-    """
+    """Forecast result returned by the /predict endpoint."""
 
     predicted_next_month_freight_usd_per_tonne: float = Field(
         ..., description="Model forecast for next-month freight rate (USD/tonne)"
@@ -149,29 +142,6 @@ class FreightResponse(BaseModel):
         description="Transparent mathematical breakdown and natural language drivers of the prediction.",
     )
 
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "predicted_next_month_freight_usd_per_tonne": 17.47,
-                "current_freight_usd_per_tonne": 16.5,
-                "forecast_change_percent": 5.88,
-                "risk_level": "LOW",
-                "recommendation": "CHARTER NOW",
-                "reason": "Forecast indicates freight rates will rise by 5.88%. Lock in current rates before they increase.",
-                "sources": {
-                    "origin": "user",
-                    "destination": "user",
-                    "commodity": "user",
-                    "vessel_type": "user",
-                    "current_freight_usd_per_tonne": "user",
-                    "wind_kmh": "weather_db[Hay Point@2026-08-28T17:14:09Z]",
-                    "wave_height_m": "weather_db[Hay Point@2026-08-28T17:14:09Z]",
-                    "bdi": "user",
-                },
-            }
-        }
-    }
-
 
 # --------------------------------------------------------------------------- #
 # Scenario Analysis Schemas (Phase 2)
@@ -179,7 +149,6 @@ class FreightResponse(BaseModel):
 class ScenarioModifications(BaseModel):
     """Simulated parameter shifts. Supports both absolute overrides and percentage shocks."""
 
-    # Absolute value overrides
     bdi: Optional[float] = Field(default=None, gt=0, description="Simulated absolute BDI (>0)")
     vlsfo_usd_per_tonne: Optional[float] = Field(
         default=None, ge=0, description="Simulated absolute VLSFO bunker price (USD/tonne)"
@@ -206,7 +175,6 @@ class ScenarioModifications(BaseModel):
         default=None, gt=0, description="Simulated absolute Current base freight (USD/tonne)"
     )
 
-    # Relative percentage shocks
     bdi_change_percent: Optional[float] = Field(
         default=None, description="Percentage change in BDI (e.g. +20.0 for +20%)"
     )
@@ -292,6 +260,195 @@ class ScenarioResponse(BaseModel):
     changes: list[ScenarioChangeItem] = Field(
         default_factory=list, description="Applied scenario modifications"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Market Intelligence & Analytics Schemas (Phase 3)
+# --------------------------------------------------------------------------- #
+class ProvenanceMeta(BaseModel):
+    """Data provenance metadata ensuring transparency of historical analytics."""
+
+    data_source: str = Field(
+        default="master_freight_training_expanded_v1.csv",
+        description="Underlying primary data file",
+    )
+    data_type: Literal["historical", "database_cache", "live_snapshot"] = Field(
+        default="historical",
+        description="Data context: genuine historical dataset vs runtime DB cache",
+    )
+    date_range: dict[str, str] = Field(
+        default_factory=lambda: {"start": "2024-02-01", "end": "2025-11-01"},
+        description="Chronological span of available observations",
+    )
+    total_records: int = Field(..., description="Total observation count in the query result")
+
+
+class FreightTrendPoint(BaseModel):
+    """Single monthly freight rate observation with month-over-month and rolling indicators."""
+
+    date: str = Field(..., description="Observation month (YYYY-MM-DD)")
+    origin: str = Field(..., description="Loading port/region")
+    destination: str = Field(..., description="Discharge port/region")
+    commodity: str = Field(..., description="Cargo commodity")
+    vessel_type: str = Field(..., description="Vessel class")
+    freight_rate_usd_per_tonne: float = Field(
+        ..., description="Observed historical freight rate (USD/tonne)"
+    )
+    previous_month_freight: Optional[float] = Field(
+        default=None, description="Previous month freight rate (USD/tonne)"
+    )
+    mom_change_usd: Optional[float] = Field(
+        default=None, description="Month-over-month absolute rate change (USD/tonne)"
+    )
+    mom_change_percent: Optional[float] = Field(
+        default=None, description="Month-over-month percentage change"
+    )
+    rolling_3m_avg: Optional[float] = Field(
+        default=None, description="3-month rolling average freight rate (USD/tonne)"
+    )
+
+
+class FreightTrendsResponse(BaseModel):
+    """Response returned by GET /analytics/freight-trends."""
+
+    provenance: ProvenanceMeta
+    filters_applied: dict[str, Optional[str]]
+    series: list[FreightTrendPoint]
+
+
+class MarketTrendPoint(BaseModel):
+    """Temporal macroeconomic and fuel price observation for a specific month."""
+
+    date: str = Field(..., description="Observation month (YYYY-MM-DD)")
+    bdi: float = Field(..., description="Baltic Dry Index benchmark")
+    vlsfo_usd_per_tonne: float = Field(..., description="VLSFO bunker fuel price (USD/tonne)")
+    coal_price_usd_per_mt: float = Field(..., description="Coal benchmark price (USD/MT)")
+    iron_ore_price_usd_per_dmt: float = Field(..., description="Iron Ore benchmark price (USD/dmt)")
+    average_freight_usd_per_tonne: float = Field(
+        ..., description="Cross-route average observed freight for this month (USD/tonne)"
+    )
+    min_freight_usd_per_tonne: float = Field(
+        ..., description="Minimum freight observed across routes (USD/tonne)"
+    )
+    max_freight_usd_per_tonne: float = Field(
+        ..., description="Maximum freight observed across routes (USD/tonne)"
+    )
+
+
+class MarketTrendsResponse(BaseModel):
+    """Response returned by GET /analytics/market-trends."""
+
+    provenance: ProvenanceMeta
+    series: list[MarketTrendPoint]
+
+
+class WeatherTrendPoint(BaseModel):
+    """Historical weather observation for a specific origin port and month."""
+
+    date: str = Field(..., description="Observation month (YYYY-MM-DD)")
+    origin: str = Field(..., description="Port or coastal loading region")
+    wind_kmh: float = Field(..., description="Wind speed (km/h)")
+    wave_height_m: float = Field(..., description="Significant wave height (m)")
+    cyclone_risk: float = Field(..., description="Cyclone risk score (0-5)")
+    weather_delay_days: float = Field(..., description="Estimated weather delay (days)")
+
+
+class WeatherTrendsResponse(BaseModel):
+    """Response returned by GET /analytics/weather-trends."""
+
+    provenance: ProvenanceMeta
+    origin_filter: Optional[str]
+    series: list[WeatherTrendPoint]
+
+
+class RouteMetric(BaseModel):
+    """Summary statistics for a canonical trade lane."""
+
+    origin: str
+    destination: str
+    commodity: str
+    vessel_type: str
+    observation_count: int
+    first_date: str
+    last_date: str
+    average_freight: float
+    minimum_freight: float
+    maximum_freight: float
+    latest_freight: float
+    latest_monthly_change: float
+    latest_monthly_change_percent: float
+    trend: Literal["RISING", "FALLING", "STABLE"]
+
+
+class RoutesResponse(BaseModel):
+    """Response returned by GET /analytics/routes."""
+
+    provenance: ProvenanceMeta
+    routes: list[RouteMetric]
+
+
+class MarketStateSnapshot(BaseModel):
+    """Snapshot of latest macroeconomic variables."""
+
+    bdi: float
+    vlsfo_usd_per_tonne: float
+    coal_price_usd_per_mt: float
+    iron_ore_price_usd_per_dmt: float
+    average_freight_usd_per_tonne: float
+
+
+class TrendClassification(BaseModel):
+    """Overall market trend evaluation."""
+
+    freight_trend_classification: Literal["RISING", "FALLING", "STABLE"]
+    methodology: str
+    recent_3m_avg_freight: float
+    prior_3m_avg_freight: float
+    shift_percent: float
+
+
+class ExecutiveSummaryResponse(BaseModel):
+    """Executive market snapshot returned by GET /analytics/summary."""
+
+    provenance: ProvenanceMeta
+    latest_date: str
+    market_state: MarketStateSnapshot
+    recent_trends: TrendClassification
+    strongest_positive_mover: Optional[RouteMetric]
+    strongest_negative_mover: Optional[RouteMetric]
+    tracked_routes_count: int
+
+
+class CorrelationItem(BaseModel):
+    """Pearson correlation record for a specific market or weather variable against freight."""
+
+    feature: str
+    feature_label: str
+    correlation: float
+    p_value: float
+    sample_count: int
+    relationship: Literal["positive", "negative", "neutral"]
+    interpretation: str
+
+
+class CorrelationsResponse(BaseModel):
+    """Response returned by GET /analytics/correlations."""
+
+    provenance: ProvenanceMeta
+    target_variable: str
+    correlations: list[CorrelationItem]
+    disclaimer: str
+
+
+class LatestMarketSnapshotResponse(BaseModel):
+    """Combined dashboard snapshot returned by GET /analytics/latest."""
+
+    provenance: ProvenanceMeta
+    latest_historical_date: str
+    market_macro: MarketStateSnapshot
+    weather_by_origin: list[WeatherTrendPoint]
+    freight_by_route: list[RouteMetric]
+    live_database_cache_status: dict[str, Any]
 
 
 class ErrorResponse(BaseModel):
