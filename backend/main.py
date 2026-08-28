@@ -1,11 +1,12 @@
-"""FastAPI application exposing the freight forecasting model.
+"""FastAPI application exposing the FINAL freight forecasting model.
 
 Run locally:
     cd backend
     python -m data.update_data          # populate the database once
     uvicorn main:app --reload --port 8000
 
-Interactive docs are available at http://localhost:8000/docs
+Interactive docs: http://localhost:8000/docs
+Frontend UI:      http://localhost:8000/
 """
 
 import sys
@@ -14,6 +15,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 # Make the backend root importable so `from data...` and `from services...`
 # work regardless of the current working directory.
@@ -22,7 +25,7 @@ if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
 from data import database
-from predict import get_model
+from predict import FEATURES, get_model, MODEL_PATH
 from schemas import (
     DataStatus,
     FreightRequest,
@@ -47,11 +50,11 @@ app = FastAPI(
     title="Freight Forecasting API",
     description=(
         "Forecast next-month bulk-cargo freight rates (USD/tonne) using the "
-        "existing trained RandomForest model, with weather-risk based "
-        "chartering recommendations. Weather data is fetched from Open-Meteo "
-        "and cached in SQLite; market/freight sources are pluggable."
+        "FINAL trained model (HistGradientBoostingRegressor). Weather data is "
+        "fetched from Open-Meteo and cached in SQLite; market/freight sources "
+        "are pluggable. The final model uses 13 input features (no cargo_tonnes)."
     ),
-    version="1.1.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -62,22 +65,41 @@ app.add_middleware(
         "http://localhost",
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:8000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Serve the static frontend (single-page HTML) at /
+_STATIC_DIR = _BACKEND_ROOT / "static"
+
 
 # --------------------------------------------------------------------------- #
-# Health & data
+# Health, model info, and data
 # --------------------------------------------------------------------------- #
 @app.get("/health")
 def health():
     """Health check used by load balancers / uptime monitors."""
     return {"status": "ok"}
+
+
+@app.get("/model/info")
+def model_info():
+    """Return metadata about the active model."""
+    return {
+        "model": "freight_forecast_model_final",
+        "version": "final",
+        "type": "HistGradientBoostingRegressor (sklearn Pipeline)",
+        "features": len(FEATURES),
+        "feature_names": FEATURES,
+        "excludes_cargo_tonnes": True,
+        "model_file": MODEL_PATH.name,
+    }
 
 
 @app.get("/data/status", response_model=DataStatus)
@@ -101,7 +123,6 @@ def data_latest():
         )
         for series, q in market_map.items()
     ]
-    # Freight: report overall count + the single most recent observation.
     with database.get_connection() as conn:
         count = conn.execute(
             "SELECT COUNT(*) AS c FROM freight_observations"
@@ -124,17 +145,32 @@ def data_latest():
 def predict(req: FreightRequest):
     """Forecast next-month freight rate and return a chartering recommendation.
 
-    Identity fields (origin, destination, commodity, vessel_type, cargo_tonnes)
-    are required. Every other field is optional and will be filled from the
-    SQLite database (latest weather for the origin port, latest market quotes,
-    latest freight observation for the route) when omitted.
+    Required: origin, destination, commodity, vessel_type, current_freight_usd_per_tonne.
+    Optional (filled from DB if omitted): bdi, vlsfo, coal_price, iron_ore,
+    wind_kmh, wave_height_m, cyclone_risk, weather_delay_days.
+
+    The final model does NOT use cargo_tonnes.
     """
     try:
         return forecast(req.model_dump(exclude_unset=False))
     except ValueError as exc:
-        # Missing inputs that could not be filled from the DB.
         raise HTTPException(status_code=422, detail=str(exc))
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=f"Model unavailable: {exc}")
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=400, detail=f"Prediction failed: {exc}")
+
+
+# --------------------------------------------------------------------------- #
+# Static frontend (served at /)
+# --------------------------------------------------------------------------- #
+if _STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+    @app.get("/")
+    def frontend():
+        """Serve the single-page freight forecasting UI."""
+        index = _STATIC_DIR / "index.html"
+        if index.exists():
+            return FileResponse(str(index))
+        return {"message": "Frontend not found. Use /docs for API."}

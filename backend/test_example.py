@@ -1,8 +1,10 @@
-"""Example request for the /predict endpoint.
+"""Example request for the /predict endpoint (FINAL model).
 
-Route:   Hay Point  ->  Visakhapatnam
+Route:   Hay Point  ->  East Coast India
 Cargo:   Coal
 Vessel:  Panamax
+
+The final model does NOT use cargo_tonnes - it uses 13 input features.
 
 Usage:
     1. Start the API:
@@ -19,21 +21,21 @@ import urllib.request
 
 URL = "http://localhost:8000/predict"
 
+# NOTE: no cargo_tonnes - the final model excludes it.
 PAYLOAD = {
     "origin": "Hay Point",
-    "destination": "Visakhapatnam",
+    "destination": "East Coast India",
     "commodity": "Coal",
     "vessel_type": "Panamax",
-    "cargo_tonnes": 75000,
-    "bdi": 1200,
-    "vlsfo_usd_per_tonne": 600,
-    "coal_price_usd_per_mt": 130,
-    "iron_ore_price_usd_per_dmt": 115,
-    "wind_kmh": 25,
-    "wave_height_m": 2.5,
+    "current_freight_usd_per_tonne": 16.5,
+    "bdi": 1560,
+    "vlsfo_usd_per_tonne": 638,
+    "coal_price_usd_per_mt": 124,
+    "iron_ore_price_usd_per_dmt": 124,
+    "wind_kmh": 32,
+    "wave_height_m": 2.0,
     "cyclone_risk": 2,
-    "weather_delay_days": 1.5,
-    "current_freight_usd_per_tonne": 28,
+    "weather_delay_days": 0.5,
 }
 
 

@@ -32,15 +32,18 @@ from predict import FEATURES, predict_freight
 
 
 # Fields the model needs but that the user is allowed to omit (filled from DB).
+# NOTE: cargo_tonnes is NOT here - the final model does not use it.
 DB_FILLABLE = {
     "wind_kmh", "wave_height_m", "cyclone_risk", "weather_delay_days",
     "bdi", "vlsfo_usd_per_tonne", "coal_price_usd_per_mt",
-    "iron_ore_price_usd_per_dmt", "current_freight_usd_per_tonne",
+    "iron_ore_price_usd_per_dmt",
 }
 
-# Fields the user MUST always provide (identity of the forecast scenario).
+# Fields the user MUST always provide (identity + current freight).
+# NOTE: cargo_tonnes is NOT required - the final model does not use it.
 REQUIRED_FROM_USER = {
-    "origin", "destination", "commodity", "vessel_type", "cargo_tonnes",
+    "origin", "destination", "commodity", "vessel_type",
+    "current_freight_usd_per_tonne",
 }
 
 
@@ -135,8 +138,9 @@ def build_forecast_input(user_input: dict) -> tuple[dict, dict]:
     _fill_weather(merged, sources, merged["origin"])
     # Fill market data.
     _fill_market(merged, sources)
-    # Fill current freight from observations.
-    _fill_freight(merged, sources)
+    # NOTE: current_freight_usd_per_tonne is now REQUIRED from the user
+    # (per final model spec), so we do NOT fill it from freight_observations.
+    # The _fill_freight function is kept for reference but not called.
 
     # Anything still missing?
     missing = [f for f in FEATURES if f not in merged or merged[f] is None]
