@@ -1,10 +1,10 @@
-"""Example request for the /predict endpoint (FINAL model).
+"""Example request for the /predict endpoint (Model v3).
 
 Route:   Hay Point  ->  East Coast India
 Cargo:   Coal
 Vessel:  Panamax
 
-The final model does NOT use cargo_tonnes - it uses 13 input features.
+Model v3 does NOT use cargo_tonnes - it uses 13 input features.
 
 Usage:
     1. Start the API:

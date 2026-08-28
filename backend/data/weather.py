@@ -28,6 +28,7 @@ from typing import Optional
 
 # Port name -> (latitude, longitude)
 PORTS: dict[str, tuple[float, float]] = {
+    "Australia West Coast": (-20.32, 118.57),
     "Hay Point": (-21.37, 149.32),
     "Taboneo": (-3.65, 114.85),
     "Visakhapatnam": (17.68, 83.27),

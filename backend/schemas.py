@@ -1,14 +1,14 @@
 """Pydantic request/response schemas for the freight forecasting API."""
 
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 
 class FreightRequest(BaseModel):
-    """Forecast request for the FINAL model (freight_forecast_model_final.joblib).
+    """Forecast request for Model v3 (freight_forecast_model_v3.joblib).
 
-    The final model uses 13 input features (NO cargo_tonnes - it was
+    Model v3 uses 13 input features (NO cargo_tonnes - it was
     intentionally excluded because cargo values were representative
     vessel capacities, not observed shipment quantities).
 
@@ -21,15 +21,15 @@ class FreightRequest(BaseModel):
         cyclone_risk, weather_delay_days
 
     If an optional field cannot be resolved from the database AND the user
-    has not supplied it, the API returns a 422 listing the missing fields.
+    has not supplied it, the API returns a structured 422 listing the missing fields.
     No values are fabricated.
     """
 
     # --- identity (required) ---
-    origin: str = Field(..., description="Loading port/region, e.g. 'Hay Point'")
-    destination: str = Field(..., description="Discharge port/region, e.g. 'East Coast India'")
-    commodity: str = Field(..., description="Cargo commodity, e.g. 'Coal'")
-    vessel_type: str = Field(..., description="Vessel class, e.g. 'Panamax'")
+    origin: str = Field(..., min_length=1, description="Loading port/region, e.g. 'Hay Point'")
+    destination: str = Field(..., min_length=1, description="Discharge port/region, e.g. 'East Coast India'")
+    commodity: str = Field(..., min_length=1, description="Cargo commodity, e.g. 'Coal'")
+    vessel_type: str = Field(..., min_length=1, description="Vessel class, e.g. 'Panamax'")
 
     # --- current freight (required - the model's primary numeric signal) ---
     current_freight_usd_per_tonne: float = Field(
@@ -37,7 +37,9 @@ class FreightRequest(BaseModel):
     )
 
     # --- market (optional, filled from market_data if omitted) ---
-    bdi: Optional[float] = Field(default=None, description="Baltic Dry Index value")
+    bdi: Optional[float] = Field(
+        default=None, gt=0, description="Baltic Dry Index value (>0)"
+    )
     vlsfo_usd_per_tonne: Optional[float] = Field(
         default=None, ge=0, description="VLSFO bunker price (USD/tonne)"
     )
@@ -79,11 +81,49 @@ class FreightRequest(BaseModel):
     }
 
 
+class ExplanationDriver(BaseModel):
+    """Additive feature contribution derived from the model pipeline."""
+
+    feature: str = Field(..., description="Feature identifier")
+    feature_label: str = Field(..., description="Human-readable feature label")
+    value: Union[float, str] = Field(..., description="Observed or input feature value")
+    unit: str = Field(default="", description="Unit of measurement (e.g. USD/tonne, points, km/h)")
+    coefficient: float = Field(..., description="Ridge regression model coefficient")
+    contribution_usd_per_tonne: float = Field(..., description="Additive linear contribution to delta (USD/tonne)")
+    effect: Literal["positive", "negative", "neutral"] = Field(..., description="Direction of contribution")
+    source: Literal["model", "context"] = Field(default="model", description="Contribution origin")
+
+
+class ExplanationAnchor(BaseModel):
+    """Mathematical decomposition of the residual prediction anchor."""
+
+    current_freight_usd_per_tonne: float = Field(..., description="Anchor spot freight rate (USD/tonne)")
+    predicted_next_month_freight_usd_per_tonne: float = Field(..., description="Forecasted level rate (USD/tonne)")
+    raw_predicted_delta_usd_per_tonne: float = Field(..., description="Unbounded raw residual delta from Ridge pipeline")
+    bounded_delta_usd_per_tonne: float = Field(..., description="Residual delta after [-4.0, +4.0] guardrail")
+    model_intercept: float = Field(..., description="Global baseline intercept term")
+    residual_guardrail_applied: bool = Field(..., description="Whether [-4.0, +4.0] clipping was triggered")
+    physical_floor_applied: bool = Field(..., description="Whether >= 1.0 USD/tonne floor was triggered")
+
+
+class PredictionExplanation(BaseModel):
+    """Transparent mathematical and natural language explanation of the forecast."""
+
+    summary: str = Field(..., description="Concise human-readable explanation of forecast drivers")
+    drivers: list[ExplanationDriver] = Field(
+        default_factory=list, description="Ranked feature-level additive contributions"
+    )
+    anchor: ExplanationAnchor = Field(..., description="Mathematical anchoring decomposition")
+
+
 class FreightResponse(BaseModel):
     """Forecast result returned by the /predict endpoint.
 
     `sources` documents where each filled field came from ('user' or a
-    database reference) so callers can see which inputs were auto-filled.
+    database reference with freshness metadata) so callers can see which inputs
+    were auto-filled.
+    `explanation` provides an exact mathematical and natural language breakdown
+    of model drivers.
     """
 
     predicted_next_month_freight_usd_per_tonne: float = Field(
@@ -102,31 +142,46 @@ class FreightResponse(BaseModel):
     reason: str = Field(..., description="Human-readable explanation of the recommendation")
     sources: dict[str, str] = Field(
         default_factory=dict,
-        description="Provenance of each model input: 'user' or a DB reference.",
+        description="Provenance of each model input: 'user' or a DB reference with freshness info.",
+    )
+    explanation: Optional[PredictionExplanation] = Field(
+        default=None,
+        description="Transparent mathematical breakdown and natural language drivers of the prediction.",
     )
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "predicted_next_month_freight_usd_per_tonne": 17.32,
+                "predicted_next_month_freight_usd_per_tonne": 17.47,
                 "current_freight_usd_per_tonne": 16.5,
-                "forecast_change_percent": 4.97,
-                "risk_level": "MEDIUM",
-                "recommendation": "MONITOR",
-                "reason": "Freight rates are expected to remain stable (+4.97%). Continue monitoring the market.",
+                "forecast_change_percent": 5.88,
+                "risk_level": "LOW",
+                "recommendation": "CHARTER NOW",
+                "reason": "Forecast indicates freight rates will rise by 5.88%. Lock in current rates before they increase.",
                 "sources": {
                     "origin": "user",
                     "destination": "user",
                     "commodity": "user",
                     "vessel_type": "user",
                     "current_freight_usd_per_tonne": "user",
-                    "wind_kmh": "weather_db[Hay Point@2026-08-27T17:14:09Z]",
-                    "wave_height_m": "weather_db[Hay Point@2026-08-27T17:14:09Z]",
+                    "wind_kmh": "weather_db[Hay Point@2026-08-28T17:14:09Z]",
+                    "wave_height_m": "weather_db[Hay Point@2026-08-28T17:14:09Z]",
                     "bdi": "user",
                 },
             }
         }
     }
+
+
+class ErrorResponse(BaseModel):
+    """Structured error payload for failed requests."""
+
+    error_code: str = Field(..., description="Machine-readable error code")
+    message: str = Field(..., description="Human-readable summary of the error")
+    missing_fields: Optional[list[str]] = Field(
+        default=None, description="List of missing feature names if applicable"
+    )
+    detail: Optional[str] = Field(default=None, description="Detailed troubleshooting instruction")
 
 
 # --------------------------------------------------------------------------- #

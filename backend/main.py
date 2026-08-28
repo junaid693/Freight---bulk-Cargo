@@ -28,6 +28,7 @@ from data import database
 from predict import FEATURES, get_model, MODEL_PATH
 from schemas import (
     DataStatus,
+    ErrorResponse,
     FreightRequest,
     FreightResponse,
     LatestData,
@@ -49,12 +50,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Freight Forecasting API",
     description=(
-        "Forecast next-month bulk-cargo freight rates (USD/tonne) using the "
-        "FINAL trained model (HistGradientBoostingRegressor). Weather data is "
-        "fetched from Open-Meteo and cached in SQLite; market/freight sources "
-        "are pluggable. The final model uses 13 input features (no cargo_tonnes)."
+        "Forecast next-month bulk-cargo freight rates (USD/tonne) using Model v3 "
+        "(Bounded Residual Ridge Regression). Weather data is fetched from Open-Meteo "
+        "and cached in SQLite; market/freight sources are pluggable. "
+        "The model uses 13 input features (no cargo_tonnes) trained on 110 real observations."
     ),
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -91,15 +92,8 @@ def health():
 @app.get("/model/info")
 def model_info():
     """Return metadata about the active model."""
-    return {
-        "model": "freight_forecast_model_final",
-        "version": "final",
-        "type": "HistGradientBoostingRegressor (sklearn Pipeline)",
-        "features": len(FEATURES),
-        "feature_names": FEATURES,
-        "excludes_cargo_tonnes": True,
-        "model_file": MODEL_PATH.name,
-    }
+    from predict import get_model_metadata
+    return get_model_metadata()
 
 
 @app.get("/data/status", response_model=DataStatus)
@@ -139,9 +133,13 @@ def data_latest():
 
 
 # --------------------------------------------------------------------------- #
-# Prediction
+# Prediction & Telemetry
 # --------------------------------------------------------------------------- #
-@app.post("/predict", response_model=FreightResponse)
+@app.post(
+    "/predict",
+    response_model=FreightResponse,
+    responses={422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def predict(req: FreightRequest):
     """Forecast next-month freight rate and return a chartering recommendation.
 
@@ -149,16 +147,59 @@ def predict(req: FreightRequest):
     Optional (filled from DB if omitted): bdi, vlsfo, coal_price, iron_ore,
     wind_kmh, wave_height_m, cyclone_risk, weather_delay_days.
 
-    The final model does NOT use cargo_tonnes.
+    Model v3 uses exactly 13 features (NO cargo_tonnes).
     """
+    from fastapi.responses import JSONResponse
+    from services.forecast_service import ForecastDataError
+
     try:
         return forecast(req.model_dump(exclude_unset=False))
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+    except ForecastDataError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "missing_fields": exc.missing_fields,
+                "detail": exc.detail,
+            },
+        )
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=500, detail=f"Model unavailable: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error_code": "MODEL_UNAVAILABLE",
+                "message": "Model artifact not found on server.",
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "INVALID_FORECAST_INPUT",
+                "message": str(exc),
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
     except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=400, detail=f"Prediction failed: {exc}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error_code": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected error occurred during forecasting.",
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+
+
+@app.get("/data/telemetry")
+def get_telemetry(limit: int = 50):
+    """Retrieve recent prediction audit logs (telemetry)."""
+    return database.get_recent_prediction_logs(limit=limit)
 
 
 # --------------------------------------------------------------------------- #

@@ -5,23 +5,31 @@ Schema:
     market_data             one row per (series, fetched_at) market quote
     freight_observations    one row per historical freight rate observation
     data_status             one row per category with a last_updated timestamp
+    prediction_logs         one row per model inference event (audit telemetry)
 
 The DB file lives at backend/data/freight.db (git-ignored). It is created
-automatically by init_db() on first use.
+automatically by init_db() on first use with WAL mode enabled.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional
+
+logger = logging.getLogger(__name__)
 
 # backend/data/freight.db  (this file is backend/data/database.py)
 DB_PATH = Path(__file__).resolve().parent / "freight.db"
 
 SCHEMA = """
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+
 CREATE TABLE IF NOT EXISTS weather_data (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     port               TEXT NOT NULL,
@@ -63,11 +71,29 @@ CREATE TABLE IF NOT EXISTS data_status (
     category     TEXT PRIMARY KEY,     -- 'weather' | 'market' | 'freight'
     last_updated TEXT
 );
+
+CREATE TABLE IF NOT EXISTS prediction_logs (
+    id                                         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at                                 TEXT NOT NULL,
+    model_version                              TEXT NOT NULL,
+    origin                                     TEXT NOT NULL,
+    destination                                TEXT NOT NULL,
+    commodity                                  TEXT NOT NULL,
+    vessel_type                                TEXT NOT NULL,
+    current_freight_usd_per_tonne             REAL NOT NULL,
+    predicted_next_month_freight_usd_per_tonne REAL NOT NULL,
+    forecast_change_percent                    REAL NOT NULL,
+    risk_level                                 TEXT NOT NULL,
+    recommendation                             TEXT NOT NULL,
+    latency_ms                                 REAL,
+    provenance                                 TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pred_logs_time ON prediction_logs(created_at);
 """
 
 
 def init_db() -> None:
-    """Create all tables if they do not already exist."""
+    """Create all tables and configure WAL mode if they do not already exist."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with get_connection() as conn:
         conn.executescript(SCHEMA)
@@ -76,9 +102,11 @@ def init_db() -> None:
 
 @contextmanager
 def get_connection() -> Iterator[sqlite3.Connection]:
-    """Yield a sqlite connection. Creates the DB file if missing."""
+    """Yield a sqlite connection with WAL mode and 10.0s timeout."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -87,7 +115,8 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    """Return timezone-aware ISO-8601 UTC timestamp ending in 'Z'."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _set_status(category: str, last_updated: str) -> None:
@@ -229,6 +258,57 @@ def get_latest_freight_observation(
             (origin, destination, commodity, vessel_type),
         ).fetchone()
     return dict(row) if row else None
+
+
+# --------------------------------------------------------------------------- #
+# Prediction Logs (Telemetry)
+# --------------------------------------------------------------------------- #
+def insert_prediction_log(
+    model_version: str,
+    origin: str,
+    destination: str,
+    commodity: str,
+    vessel_type: str,
+    current_freight_usd_per_tonne: float,
+    predicted_next_month_freight_usd_per_tonne: float,
+    forecast_change_percent: float,
+    risk_level: str,
+    recommendation: str,
+    latency_ms: Optional[float] = None,
+    provenance: Optional[dict | str] = None,
+) -> None:
+    """Record a prediction event in prediction_logs. Failures are logged and never raised."""
+    try:
+        ts = _now_iso()
+        prov_str = json.dumps(provenance) if isinstance(provenance, dict) else str(provenance or "")
+        with get_connection() as conn:
+            conn.execute(
+                """INSERT INTO prediction_logs
+                   (created_at, model_version, origin, destination, commodity,
+                    vessel_type, current_freight_usd_per_tonne,
+                    predicted_next_month_freight_usd_per_tonne,
+                    forecast_change_percent, risk_level, recommendation,
+                    latency_ms, provenance)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (ts, model_version, origin, destination, commodity,
+                 vessel_type, current_freight_usd_per_tonne,
+                 predicted_next_month_freight_usd_per_tonne,
+                 forecast_change_percent, risk_level, recommendation,
+                 latency_ms, prov_str),
+            )
+            conn.commit()
+    except Exception as exc:
+        logger.warning("Failed to insert prediction telemetry log: %s", exc)
+
+
+def get_recent_prediction_logs(limit: int = 50) -> list[dict]:
+    """Retrieve recent prediction logs for monitoring."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT * FROM prediction_logs ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 # --------------------------------------------------------------------------- #

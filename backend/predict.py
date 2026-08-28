@@ -1,27 +1,42 @@
-"""Model loading and freight forecasting logic.
+"""Model loading, freight forecasting, and explainability logic.
 
-Uses the FINAL trained model file `freight_forecast_model_final.joblib`
-(located at the repository root). The model file is never modified or
-retrained - it is only loaded for inference.
+Uses the active Model v3 file `freight_forecast_model_v3.joblib`
+(located at the repository root). The model file is loaded for inference only.
 
-The final model (HistGradientBoostingRegressor inside an sklearn Pipeline)
-uses exactly 13 input features (NO cargo_tonnes - the final model
-intentionally excludes it because cargo values were representative
-vessel capacities, not observed shipment quantities).
+Model v3 Architecture:
+- Bounded Residual Ridge Regression (alpha = 10.0)
+- Predicts monthly freight rate change (delta):
+      forecast = current_freight_usd_per_tonne + clip(predicted_delta, -4.0, 4.0)
+- Defensive residual guardrail [-4.0, +4.0] USD/tonne (training-derived)
+- Enforces physical non-negative level floor (minimum 1.0 USD/tonne)
+- Uses exactly 13 input features (NO cargo_tonnes)
+- Trained strictly on 110 real historical observations
+- Quarantined synthetic data excluded from production inference
+
+Explainability Layer:
+- Exact additive feature contribution decomposition from the trained Ridge pipeline
+- Closed-form coefficient-level attribution without approximations or fabrication
 """
 
 from pathlib import Path
+from typing import Optional
 
 import joblib
+import numpy as np
 import pandas as pd
+from sklearn.linear_model import Ridge
 
 # Repository root is the parent of this backend/ directory.
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = REPO_ROOT / "freight_forecast_model_final.joblib"
 
-# Exact 13-feature contract expected by the final model pipeline
-# (verified from model.feature_names_in_). cargo_tonnes is intentionally
-# ABSENT - the final model was trained without it.
+# Active production model (v3)
+MODEL_PATH = REPO_ROOT / "freight_forecast_model_v3.joblib"
+
+# Preserved historical models for rollback / comparison
+MODEL_V1_PATH = REPO_ROOT / "freight_forecast_model_v1.joblib"
+MODEL_FINAL_PATH = REPO_ROOT / "freight_forecast_model_final.joblib"
+
+# Exact 13-feature contract expected by Model v3 (and v2/final)
 FEATURES = [
     "origin",
     "destination",
@@ -38,6 +53,22 @@ FEATURES = [
     "current_freight_usd_per_tonne",
 ]
 
+FEATURE_METADATA = {
+    "vlsfo_usd_per_tonne": ("VLSFO Bunker Price", "USD/tonne"),
+    "bdi": ("Baltic Dry Index (BDI)", "points"),
+    "cyclone_risk": ("Cyclone Risk Score", "0-5"),
+    "wave_height_m": ("Significant Wave Height", "m"),
+    "wind_kmh": ("Wind Speed", "km/h"),
+    "weather_delay_days": ("Weather Delay Estimate", "days"),
+    "coal_price_usd_per_mt": ("Coal Benchmark Price", "USD/MT"),
+    "iron_ore_price_usd_per_dmt": ("Iron Ore Benchmark Price", "USD/dmt"),
+    "current_freight_usd_per_tonne": ("Current Base Freight (Mean Reversion)", "USD/tonne"),
+    "origin": ("Loading Port Context", ""),
+    "commodity": ("Cargo Commodity Context", ""),
+    "vessel_type": ("Vessel Class Context", ""),
+    "destination": ("Discharge Port Context", ""),
+}
+
 # Loaded once and cached for the lifetime of the process.
 _model = None
 
@@ -50,6 +81,38 @@ def get_model():
             raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
         _model = joblib.load(MODEL_PATH)
     return _model
+
+
+def get_model_metadata() -> dict:
+    """Return dynamic metadata about the currently active model."""
+    model = get_model()
+    est = model.named_steps.get("model") if hasattr(model, "named_steps") else model
+    is_v3 = MODEL_PATH.name == "freight_forecast_model_v3.joblib" or isinstance(est, Ridge)
+
+    if is_v3:
+        return {
+            "model": "freight_forecast_model_v3",
+            "version": "3.0.0",
+            "algorithm": "Bounded Residual Ridge Regression",
+            "alpha": getattr(est, "alpha", 10.0),
+            "residual_guardrail_usd_per_tonne": [-4.0, 4.0],
+            "features": len(FEATURES),
+            "feature_names": FEATURES,
+            "excludes_cargo_tonnes": True,
+            "model_file": MODEL_PATH.name,
+            "training_dataset": "master_freight_training_expanded_v1.csv (110 real observations)",
+            "synthetic_data_used": False,
+        }
+    else:
+        return {
+            "model": MODEL_PATH.stem,
+            "version": "legacy",
+            "type": type(est).__name__,
+            "features": len(FEATURES),
+            "feature_names": FEATURES,
+            "excludes_cargo_tonnes": True,
+            "model_file": MODEL_PATH.name,
+        }
 
 
 def compute_risk_level(cyclone_risk: float, weather_delay_days: float) -> str:
@@ -102,23 +165,155 @@ def compute_recommendation(forecast_change_percent: float, risk_level: str):
     return "MONITOR", reason
 
 
+def compute_explanation(
+    data: dict,
+    current: float,
+    predicted: float,
+    raw_delta: float,
+    bounded_delta: float,
+    model,
+) -> dict:
+    """Derive exact mathematical feature contributions from the Ridge pipeline."""
+    prep = getattr(model, "named_steps", {}).get("prep")
+    ridge = getattr(model, "named_steps", {}).get("model")
+
+    if prep is None or ridge is None or not hasattr(ridge, "coef_"):
+        # Fallback for non-pipeline or legacy models
+        return {
+            "summary": f"Freight forecasted at ${predicted:.2f}/t from base rate ${current:.2f}/t.",
+            "drivers": [],
+            "anchor": {
+                "current_freight_usd_per_tonne": round(current, 2),
+                "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
+                "raw_predicted_delta_usd_per_tonne": round(raw_delta, 4),
+                "bounded_delta_usd_per_tonne": round(bounded_delta, 4),
+                "model_intercept": 0.0,
+                "residual_guardrail_applied": False,
+                "physical_floor_applied": False,
+            },
+        }
+
+    df_x = pd.DataFrame([{f: data[f] for f in FEATURES}])
+    feature_names = prep.get_feature_names_out()
+    transformed_vals = prep.transform(df_x)[0]
+
+    drivers = []
+    cat_columns = ["origin", "destination", "commodity", "vessel_type"]
+
+    for fn, val, coef in zip(feature_names, transformed_vals, ridge.coef_):
+        term = float(val * coef)
+        if fn.startswith("cat__"):
+            for cat_col in cat_columns:
+                prefix = f"cat__{cat_col}_"
+                if fn.startswith(prefix):
+                    if val == 1.0:  # active categorical category
+                        cat_val = data.get(cat_col, "")
+                        label, unit = FEATURE_METADATA.get(cat_col, (cat_col.replace("_", " ").title(), ""))
+                        drivers.append({
+                            "feature": cat_col,
+                            "feature_label": f"{label} ({cat_val})",
+                            "value": str(cat_val),
+                            "unit": unit,
+                            "coefficient": round(float(coef), 4),
+                            "contribution_usd_per_tonne": round(term, 4),
+                            "effect": "positive" if term > 0.001 else ("negative" if term < -0.001 else "neutral"),
+                            "source": "model",
+                        })
+                    break
+        else:
+            col = fn.split("__")[1]
+            val_num = float(data.get(col, 0.0))
+            label, unit = FEATURE_METADATA.get(col, (col.replace("_", " ").title(), ""))
+            drivers.append({
+                "feature": col,
+                "feature_label": label,
+                "value": round(val_num, 2),
+                "unit": unit,
+                "coefficient": round(float(coef), 4),
+                "contribution_usd_per_tonne": round(term, 4),
+                "effect": "positive" if term > 0.001 else ("negative" if term < -0.001 else "neutral"),
+                "source": "model",
+            })
+
+    # Sort drivers by absolute contribution magnitude descending
+    drivers.sort(key=lambda d: abs(d["contribution_usd_per_tonne"]), reverse=True)
+
+    # Dynamic natural language summary based on actual top contributors
+    direction = "increase" if bounded_delta > 0.05 else ("drop" if bounded_delta < -0.05 else "remain stable")
+    pct_str = f"({(predicted - current) / current * 100:+.2f}%)" if current > 0 else ""
+
+    pos_drivers = [d for d in drivers if d["effect"] == "positive" and d["feature"] != "destination"]
+    neg_drivers = [d for d in drivers if d["effect"] == "negative" and d["feature"] != "destination"]
+
+    top_pos = pos_drivers[0]["feature_label"] if pos_drivers else None
+    top_neg = neg_drivers[0]["feature_label"] if neg_drivers else None
+
+    if direction == "increase":
+        reason_core = f"The model's upward forecast (+${bounded_delta:.2f}/t) is primarily driven by {top_pos}."
+        if top_neg:
+            reason_core += f" Downward pressure from {top_neg} partially offset this increase."
+    elif direction == "drop":
+        reason_core = f"The model's downward forecast (${bounded_delta:.2f}/t) is primarily driven by {top_neg}."
+        if top_pos:
+            reason_core += f" Upward support from {top_pos} buffered the decline."
+    else:
+        reason_core = "Opposing market and weather forces balance out, keeping projected rates stable."
+
+    summary = (
+        f"Freight is projected to {direction} from ${current:.2f}/t to ${predicted:.2f}/t {pct_str}. "
+        f"{reason_core}"
+    )
+
+    guardrail_applied = bool(abs(raw_delta) > 4.0)
+    floor_applied = bool((current + bounded_delta) < 1.0)
+
+    anchor = {
+        "current_freight_usd_per_tonne": round(current, 2),
+        "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
+        "raw_predicted_delta_usd_per_tonne": round(raw_delta, 4),
+        "bounded_delta_usd_per_tonne": round(bounded_delta, 4),
+        "model_intercept": round(float(ridge.intercept_), 4),
+        "residual_guardrail_applied": guardrail_applied,
+        "physical_floor_applied": floor_applied,
+    }
+
+    return {
+        "summary": summary,
+        "drivers": drivers,
+        "anchor": anchor,
+    }
+
+
 def predict_freight(data: dict) -> dict:
-    """Run a single freight forecast.
+    """Run a single freight forecast with exact mathematical explainability.
 
     Args:
         data: dict containing all 13 model input features.
 
     Returns:
-        dict with the prediction, risk level, recommendation and reason.
+        dict with the prediction, risk level, recommendation, reason, and explanation.
     """
     model = get_model()
 
     # Build a single-row DataFrame with the exact column order the
     # ColumnTransformer expects (it selects columns by name).
     X = pd.DataFrame([{feature: data[feature] for feature in FEATURES}])
-
-    predicted = float(model.predict(X)[0])
     current = float(data["current_freight_usd_per_tonne"])
+
+    # Determine if model is a residual pipeline (predicts delta) or legacy (predicts level)
+    est = model.named_steps.get("model") if hasattr(model, "named_steps") else model
+    is_residual = MODEL_PATH.name == "freight_forecast_model_v3.joblib" or isinstance(est, Ridge)
+
+    if is_residual:
+        raw_delta = float(model.predict(X)[0])
+        # Defensive residual guardrail [-4.0, +4.0]
+        bounded_delta = max(-4.0, min(4.0, raw_delta))
+        # Enforce physical non-negative freight floor (minimum 1.0 USD/tonne)
+        predicted = max(1.0, current + bounded_delta)
+    else:
+        raw_delta = 0.0
+        bounded_delta = 0.0
+        predicted = max(1.0, float(model.predict(X)[0]))
 
     if current > 0:
         change_percent = (predicted - current) / current * 100.0
@@ -129,6 +324,7 @@ def predict_freight(data: dict) -> dict:
         float(data["cyclone_risk"]), float(data["weather_delay_days"])
     )
     recommendation, reason = compute_recommendation(change_percent, risk_level)
+    explanation = compute_explanation(data, current, predicted, raw_delta, bounded_delta, model)
 
     return {
         "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
@@ -137,4 +333,5 @@ def predict_freight(data: dict) -> dict:
         "risk_level": risk_level,
         "recommendation": recommendation,
         "reason": reason,
+        "explanation": explanation,
     }
