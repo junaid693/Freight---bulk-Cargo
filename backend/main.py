@@ -1,4 +1,4 @@
-"""FastAPI application exposing Model v3 forecasting, scenario simulation, and market intelligence.
+"""FastAPI application exposing Model v3 forecasting, scenario simulation, market intelligence, and dashboard overview.
 
 Run locally:
     cd backend
@@ -29,6 +29,7 @@ from data import database
 from predict import FEATURES, get_model, get_model_metadata, MODEL_PATH
 from schemas import (
     CorrelationsResponse,
+    DashboardOverviewResponse,
     DataStatus,
     ErrorResponse,
     ExecutiveSummaryResponse,
@@ -45,7 +46,7 @@ from schemas import (
     WeatherSnapshot,
     WeatherTrendsResponse,
 )
-from services import analytics_service
+from services import analytics_service, dashboard_service
 from services.forecast_service import (
     ForecastDataError,
     forecast,
@@ -64,11 +65,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Freight Forecasting & Market Intelligence API (Model v3)",
+    title="Freight Forecasting & Intelligence API (Model v3)",
     description=(
-        "Production inference, what-if scenario simulation, and market intelligence API for dry bulk ocean freight. "
-        "Forecasts next-month rates (USD/tonne) with closed-form mathematical explainability and provides "
-        "comprehensive historical market trends and correlations."
+        "Production inference, what-if scenario simulation, market intelligence, and executive dashboard API "
+        "for dry bulk ocean freight. Forecasts next-month rates (USD/tonne) with closed-form mathematical explainability "
+        "and aggregates macro indicators, route benchmarks, weather risks, and deterministic signals."
     ),
     version="3.0.0",
     lifespan=lifespan,
@@ -136,6 +137,15 @@ def data_latest():
         freight_observations_count=count,
         latest_freight_observation=dict(latest) if latest else None,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Dashboard Overview Aggregation (Phase 4)
+# --------------------------------------------------------------------------- #
+@app.get("/dashboard/overview", response_model=DashboardOverviewResponse)
+def get_dashboard_overview():
+    """Retrieve unified executive dashboard overview aggregating market, routes, weather, forecasts, and signals."""
+    return dashboard_service.get_dashboard_overview()
 
 
 # --------------------------------------------------------------------------- #

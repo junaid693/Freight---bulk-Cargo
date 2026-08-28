@@ -1,4 +1,4 @@
-"""Comprehensive automated test suite for Freight Forecasting backend, Explainability, Scenario Analysis, and Market Intelligence.
+"""Comprehensive automated test suite for Freight Forecasting backend, Explainability, Scenario Analysis, Market Intelligence, and Dashboard.
 
 Uses Python standard library `unittest` + FastAPI TestClient.
 Tests are deterministic and do not make live external network calls.
@@ -33,7 +33,7 @@ from predict import (
     predict_freight,
 )
 from schemas import FreightRequest, FreightResponse
-from services import analytics_service
+from services import analytics_service, dashboard_service
 from services.forecast_service import (
     ForecastDataError,
     build_forecast_input,
@@ -323,7 +323,7 @@ class TestMarketIntelligenceAnalytics(unittest.TestCase):
         resp = self.client.get("/analytics/freight-trends?origin=Hay%20Point&commodity=Coal")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(data["provenance"]["total_records"], 44)  # 2 vessel types * 22 months = 44
+        self.assertEqual(data["provenance"]["total_records"], 44)
         for pt in data["series"]:
             self.assertEqual(pt["origin"], "Hay Point")
             self.assertEqual(pt["commodity"], "Coal")
@@ -339,11 +339,10 @@ class TestMarketIntelligenceAnalytics(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
 
-        self.assertEqual(data["provenance"]["total_records"], 22)  # 22 distinct monthly snapshots
+        self.assertEqual(data["provenance"]["total_records"], 22)
         series = data["series"]
         self.assertEqual(len(series), 22)
 
-        # Check chronological order
         dates = [s["date"] for s in series]
         self.assertEqual(dates, sorted(dates))
         self.assertEqual(dates[0], "2024-02-01")
@@ -411,7 +410,6 @@ class TestMarketIntelligenceAnalytics(unittest.TestCase):
         self.assertIn("vlsfo_usd_per_tonne", corrs)
         self.assertIn("cyclone_risk", corrs)
 
-        # BDI and VLSFO have positive correlation with freight
         self.assertGreater(corrs["bdi"], 0.4)
         self.assertGreater(corrs["vlsfo_usd_per_tonne"], 0.4)
 
@@ -427,9 +425,133 @@ class TestMarketIntelligenceAnalytics(unittest.TestCase):
         self.assertIn("live_database_cache_status", data)
 
     def test_quarantine_guard_synthetic_data_not_used(self):
-        """Verify that analytics service never points to or reads synthetic_v2."""
         self.assertNotIn("synthetic", str(analytics_service.HISTORICAL_CSV_PATH).lower())
         self.assertEqual(analytics_service.HISTORICAL_CSV_PATH.name, "master_freight_training_expanded_v1.csv")
+
+
+class TestDashboardOverview(unittest.TestCase):
+    """Tests Phase 4 Dashboard Intelligence aggregation endpoint GET /dashboard/overview."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+        database.init_db()
+
+    def test_dashboard_overview_status_and_top_keys(self):
+        resp = self.client.get("/dashboard/overview")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        expected_keys = [
+            "market", "routes", "weather", "forecast",
+            "signals", "data_quality", "model", "provenance"
+        ]
+        for k in expected_keys:
+            self.assertIn(k, data, f"Missing key '{k}' in /dashboard/overview response")
+
+    def test_dashboard_market_section(self):
+        resp = self.client.get("/dashboard/overview")
+        data = resp.json()["market"]
+
+        self.assertEqual(data["latest_date"], "2025-11-01")
+        self.assertGreater(data["bdi"], 0)
+        self.assertGreater(data["vlsfo_usd_per_tonne"], 0)
+        self.assertGreater(data["coal_price_usd_per_mt"], 0)
+        self.assertGreater(data["iron_ore_price_usd_per_dmt"], 0)
+        self.assertGreater(data["average_freight_usd_per_tonne"], 0)
+        self.assertIn(data["freight_trend_classification"], ["RISING", "FALLING", "STABLE"])
+
+    def test_dashboard_routes_and_rankings(self):
+        resp = self.client.get("/dashboard/overview")
+        routes_sec = resp.json()["routes"]
+
+        canonical = routes_sec["canonical_lanes"]
+        self.assertEqual(len(canonical), 5)
+
+        rankings = routes_sec["rankings"]
+        self.assertIn("highest_freight", rankings)
+        self.assertIn("lowest_freight", rankings)
+        self.assertIn("strongest_momentum", rankings)
+        self.assertIn("weakest_momentum", rankings)
+
+        # Mathematical consistency
+        all_latest = [r["latest_freight"] for r in canonical]
+        self.assertEqual(rankings["highest_freight"]["latest_freight"], max(all_latest))
+        self.assertEqual(rankings["lowest_freight"]["latest_freight"], min(all_latest))
+
+        all_mom = [r["latest_monthly_change_percent"] for r in canonical]
+        self.assertEqual(rankings["strongest_momentum"]["latest_monthly_change_percent"], max(all_mom))
+        self.assertEqual(rankings["weakest_momentum"]["latest_monthly_change_percent"], min(all_mom))
+
+    def test_dashboard_weather_section(self):
+        resp = self.client.get("/dashboard/overview")
+        w_sec = resp.json()["weather"]
+
+        self.assertEqual(w_sec["status"], "available")
+        self.assertEqual(w_sec["observation_date"], "2025-11-01")
+        self.assertGreaterEqual(len(w_sec["ports"]), 3)
+
+        ports = {p["port"] for p in w_sec["ports"]}
+        self.assertTrue({"Australia West Coast", "Hay Point", "Taboneo"}.issubset(ports))
+
+        for p in w_sec["ports"]:
+            self.assertIn(p["risk_level"], ["LOW", "MEDIUM", "HIGH"])
+            self.assertIn(p["status"], ["available", "stale", "unavailable"])
+
+    def test_dashboard_forecast_intelligence(self):
+        resp = self.client.get("/dashboard/overview")
+        fc_sec = resp.json()["forecast"]
+
+        self.assertIn("reference_summary", fc_sec)
+        route_fcs = fc_sec["route_forecasts"]
+        self.assertEqual(len(route_fcs), 5)
+
+        for fc in route_fcs:
+            self.assertGreaterEqual(fc["current_freight_usd_per_tonne"], 1.0)
+            self.assertGreaterEqual(fc["predicted_next_month_freight_usd_per_tonne"], 1.0)
+            self.assertIn(fc["risk_level"], ["LOW", "MEDIUM", "HIGH"])
+            self.assertIn(fc["recommendation"], ["CHARTER NOW", "WAIT", "MONITOR"])
+            self.assertIn("USD/t", fc["top_driver"])
+
+    def test_dashboard_signals_determinism(self):
+        resp = self.client.get("/dashboard/overview")
+        signals = resp.json()["signals"]
+
+        self.assertGreaterEqual(len(signals), 4)
+        for sig in signals:
+            self.assertIn("type", sig)
+            self.assertIn(sig["severity"], ["LOW", "MEDIUM", "HIGH"])
+            self.assertIn("title", sig)
+            self.assertIn("description", sig)
+            self.assertIn("evidence", sig)
+
+    def test_dashboard_data_quality_and_provenance(self):
+        resp = self.client.get("/dashboard/overview")
+        data = resp.json()
+
+        dq = data["data_quality"]
+        self.assertTrue(dq["historical_dataset_verified"])
+        self.assertEqual(dq["historical_records_count"], 110)
+        self.assertFalse(dq["synthetic_data_used"])
+        self.assertTrue(dq["synthetic_dataset_quarantined"])
+        self.assertEqual(dq["overall_health_status"], "HEALTHY")
+
+        prov = data["provenance"]
+        self.assertEqual(prov["model_sha256"], dashboard_service.MODEL_SHA256)
+        self.assertFalse(prov["synthetic_data_used"])
+        self.assertEqual(prov["historical_dataset"]["records"], 110)
+
+    def test_dashboard_model_metadata(self):
+        resp = self.client.get("/dashboard/overview")
+        model = resp.json()["model"]
+
+        self.assertEqual(model["model_name"], "freight_forecast_model_v3")
+        self.assertEqual(model["algorithm"], "Bounded Residual Ridge Regression")
+        self.assertEqual(model["alpha"], 10.0)
+        self.assertEqual(model["features_count"], 13)
+        self.assertTrue(model["excludes_cargo_tonnes"])
+        self.assertFalse(model["synthetic_data_used"])
+        self.assertEqual(model["validation_evidence"]["holdout_mae_usd_per_tonne"], 0.4730)
+        self.assertEqual(model["validation_evidence"]["directional_accuracy_percent"], 60.0)
 
 
 class TestPredictionSafetyAndBounds(unittest.TestCase):
