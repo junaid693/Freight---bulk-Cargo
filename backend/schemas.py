@@ -173,6 +173,127 @@ class FreightResponse(BaseModel):
     }
 
 
+# --------------------------------------------------------------------------- #
+# Scenario Analysis Schemas (Phase 2)
+# --------------------------------------------------------------------------- #
+class ScenarioModifications(BaseModel):
+    """Simulated parameter shifts. Supports both absolute overrides and percentage shocks."""
+
+    # Absolute value overrides
+    bdi: Optional[float] = Field(default=None, gt=0, description="Simulated absolute BDI (>0)")
+    vlsfo_usd_per_tonne: Optional[float] = Field(
+        default=None, ge=0, description="Simulated absolute VLSFO bunker price (USD/tonne)"
+    )
+    coal_price_usd_per_mt: Optional[float] = Field(
+        default=None, ge=0, description="Simulated absolute Coal benchmark price (USD/MT)"
+    )
+    iron_ore_price_usd_per_dmt: Optional[float] = Field(
+        default=None, ge=0, description="Simulated absolute Iron ore price (USD/dmt)"
+    )
+    wind_kmh: Optional[float] = Field(
+        default=None, ge=0, description="Simulated absolute Wind speed (km/h)"
+    )
+    wave_height_m: Optional[float] = Field(
+        default=None, ge=0, description="Simulated absolute Wave height (m)"
+    )
+    cyclone_risk: Optional[float] = Field(
+        default=None, ge=0, le=5, description="Simulated absolute Cyclone risk score (0-5)"
+    )
+    weather_delay_days: Optional[float] = Field(
+        default=None, ge=0, description="Simulated absolute Weather delay estimate (days)"
+    )
+    current_freight_usd_per_tonne: Optional[float] = Field(
+        default=None, gt=0, description="Simulated absolute Current base freight (USD/tonne)"
+    )
+
+    # Relative percentage shocks
+    bdi_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in BDI (e.g. +20.0 for +20%)"
+    )
+    vlsfo_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in VLSFO price (e.g. +10.0 for +10%)"
+    )
+    coal_price_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in Coal price (e.g. -5.0 for -5%)"
+    )
+    iron_ore_price_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in Iron Ore price (e.g. +5.0 for +5%)"
+    )
+    wind_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in Wind speed (e.g. +30.0 for +30%)"
+    )
+    wave_height_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in Wave height (e.g. +25.0 for +25%)"
+    )
+    cyclone_risk_change: Optional[float] = Field(
+        default=None, description="Point change in Cyclone risk (e.g. +2.0 to move 2 -> 4)"
+    )
+    weather_delay_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in Weather delay (e.g. +50.0 for +50%)"
+    )
+    current_freight_change_percent: Optional[float] = Field(
+        default=None, description="Percentage change in Current freight (e.g. -10.0 for -10%)"
+    )
+
+
+class ScenarioRequest(FreightRequest):
+    """What-if scenario request inheriting baseline inputs plus scenario modifications."""
+
+    scenario_changes: Optional[ScenarioModifications] = Field(
+        default=None,
+        description="Scenario parameter modifications or relative shocks.",
+    )
+
+
+class ScenarioChangeItem(BaseModel):
+    """Detailed record of a single changed input parameter."""
+
+    feature: str = Field(..., description="Feature identifier")
+    feature_label: str = Field(..., description="Human-readable feature name")
+    baseline: float = Field(..., description="Baseline input value")
+    scenario: float = Field(..., description="Simulated scenario input value")
+    absolute_change: float = Field(..., description="Scenario minus baseline value")
+    percentage_change: Optional[float] = Field(
+        default=None, description="Percentage shift relative to baseline"
+    )
+    unit: str = Field(default="", description="Unit of measurement")
+
+
+class ScenarioImpact(BaseModel):
+    """Comparative impact metrics between baseline and scenario predictions."""
+
+    difference_usd_per_tonne: float = Field(
+        ..., description="Scenario predicted rate minus baseline predicted rate (USD/tonne)"
+    )
+    difference_percent: float = Field(
+        ..., description="Percentage difference in forecast vs baseline forecast"
+    )
+    baseline_change_percent: float = Field(
+        ..., description="Baseline forecast change percent vs base freight"
+    )
+    scenario_change_percent: float = Field(
+        ..., description="Scenario forecast change percent vs base freight"
+    )
+    risk_level_shift: str = Field(
+        ..., description="Risk level change, e.g. 'LOW -> HIGH' or 'LOW (unchanged)'"
+    )
+    recommendation_shift: str = Field(
+        ..., description="Recommendation change, e.g. 'MONITOR -> CHARTER NOW'"
+    )
+
+
+class ScenarioResponse(BaseModel):
+    """Complete response returned by POST /predict/scenario."""
+
+    summary: str = Field(..., description="Executive natural language scenario summary")
+    baseline: FreightResponse = Field(..., description="Baseline prediction & explainability")
+    scenario: FreightResponse = Field(..., description="Simulated scenario prediction & explainability")
+    impact: ScenarioImpact = Field(..., description="Comparative delta impact metrics")
+    changes: list[ScenarioChangeItem] = Field(
+        default_factory=list, description="Applied scenario modifications"
+    )
+
+
 class ErrorResponse(BaseModel):
     """Structured error payload for failed requests."""
 

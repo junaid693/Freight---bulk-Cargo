@@ -1,4 +1,4 @@
-"""Comprehensive automated test suite for Freight Forecasting backend and ML pipeline.
+"""Comprehensive automated test suite for Freight Forecasting backend, Explainability, and Scenario Analysis.
 
 Uses Python standard library `unittest` + FastAPI TestClient.
 Tests are deterministic and do not make live external network calls.
@@ -33,7 +33,12 @@ from predict import (
     predict_freight,
 )
 from schemas import FreightRequest, FreightResponse
-from services.forecast_service import ForecastDataError, build_forecast_input, forecast
+from services.forecast_service import (
+    ForecastDataError,
+    build_forecast_input,
+    forecast,
+    run_scenario_forecast,
+)
 
 
 class TestModelContract(unittest.TestCase):
@@ -157,6 +162,182 @@ class TestForecastExplainability(unittest.TestCase):
             self.assertIn("explanation", res)
             self.assertTrue(len(res["explanation"]["drivers"]) > 0)
             self.assertTrue(len(res["explanation"]["summary"]) > 20)
+
+
+class TestScenarioAnalysis(unittest.TestCase):
+    """Tests what-if scenario simulations, parameter shocks, and safety bounds."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+        database.init_db()
+
+    def test_baseline_scenario_equality_when_unchanged(self):
+        """When scenario_changes is empty, scenario prediction MUST equal baseline and /predict."""
+        payload = {
+            "origin": "Hay Point",
+            "destination": "East Coast India",
+            "commodity": "Coal",
+            "vessel_type": "Panamax",
+            "current_freight_usd_per_tonne": 16.5,
+            "bdi": 1560.0,
+            "vlsfo_usd_per_tonne": 638.0,
+            "coal_price_usd_per_mt": 124.0,
+            "iron_ore_price_usd_per_dmt": 124.0,
+            "wind_kmh": 32.0,
+            "wave_height_m": 2.0,
+            "cyclone_risk": 2.0,
+            "weather_delay_days": 0.5,
+            "scenario_changes": {},
+        }
+        # Call /predict
+        resp_predict = self.client.post("/predict", json=payload)
+        self.assertEqual(resp_predict.status_code, 200)
+        norm_res = resp_predict.json()
+
+        # Call /predict/scenario
+        resp_scen = self.client.post("/predict/scenario", json=payload)
+        self.assertEqual(resp_scen.status_code, 200)
+        scen_res = resp_scen.json()
+
+        self.assertEqual(
+            scen_res["baseline"]["predicted_next_month_freight_usd_per_tonne"],
+            norm_res["predicted_next_month_freight_usd_per_tonne"],
+        )
+        self.assertEqual(
+            scen_res["scenario"]["predicted_next_month_freight_usd_per_tonne"],
+            norm_res["predicted_next_month_freight_usd_per_tonne"],
+        )
+        self.assertEqual(scen_res["impact"]["difference_usd_per_tonne"], 0.0)
+        self.assertEqual(len(scen_res["changes"]), 0)
+
+    def test_vlsfo_percentage_shock_scenario(self):
+        """+10% bunker fuel price should increase next-month freight forecast."""
+        payload = {
+            "origin": "Hay Point",
+            "destination": "East Coast India",
+            "commodity": "Coal",
+            "vessel_type": "Panamax",
+            "current_freight_usd_per_tonne": 16.5,
+            "bdi": 1560.0,
+            "vlsfo_usd_per_tonne": 638.0,
+            "coal_price_usd_per_mt": 124.0,
+            "iron_ore_price_usd_per_dmt": 124.0,
+            "wind_kmh": 32.0,
+            "wave_height_m": 2.0,
+            "cyclone_risk": 2.0,
+            "weather_delay_days": 0.5,
+            "scenario_changes": {
+                "vlsfo_change_percent": 10.0,
+            },
+        }
+        resp = self.client.post("/predict/scenario", json=payload)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        base_rate = data["baseline"]["predicted_next_month_freight_usd_per_tonne"]
+        scen_rate = data["scenario"]["predicted_next_month_freight_usd_per_tonne"]
+
+        self.assertGreater(scen_rate, base_rate)
+        self.assertGreater(data["impact"]["difference_usd_per_tonne"], 0.0)
+        self.assertEqual(len(data["changes"]), 1)
+        self.assertEqual(data["changes"][0]["feature"], "vlsfo_usd_per_tonne")
+        self.assertEqual(data["changes"][0]["baseline"], 638.0)
+        self.assertEqual(data["changes"][0]["scenario"], 701.8)
+
+    def test_cyclone_risk_shock_shifts_recommendation(self):
+        """Cyclone risk shock from 2 -> 5 should shift risk level to HIGH and recommend CHARTER NOW."""
+        payload = {
+            "origin": "Taboneo",
+            "destination": "East Coast India",
+            "commodity": "Thermal Coal",
+            "vessel_type": "Panamax",
+            "current_freight_usd_per_tonne": 11.0,
+            "bdi": 1560.0,
+            "vlsfo_usd_per_tonne": 638.0,
+            "coal_price_usd_per_mt": 124.0,
+            "iron_ore_price_usd_per_dmt": 124.0,
+            "wind_kmh": 15.0,
+            "wave_height_m": 1.0,
+            "cyclone_risk": 1.0,
+            "weather_delay_days": 0.0,
+            "scenario_changes": {
+                "cyclone_risk": 5.0,
+            },
+        }
+        resp = self.client.post("/predict/scenario", json=payload)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data["baseline"]["risk_level"], "LOW")
+        self.assertEqual(data["scenario"]["risk_level"], "HIGH")
+        self.assertEqual(data["scenario"]["recommendation"], "CHARTER NOW")
+        self.assertIn("LOW -> HIGH", data["impact"]["risk_level_shift"])
+
+    def test_invalid_scenario_inputs_rejected_with_422(self):
+        base = {
+            "origin": "Hay Point",
+            "destination": "East Coast India",
+            "commodity": "Coal",
+            "vessel_type": "Panamax",
+            "current_freight_usd_per_tonne": 16.5,
+            "bdi": 1560.0,
+            "vlsfo_usd_per_tonne": 638.0,
+            "coal_price_usd_per_mt": 124.0,
+            "iron_ore_price_usd_per_dmt": 124.0,
+            "wind_kmh": 32.0,
+            "wave_height_m": 2.0,
+            "cyclone_risk": 2.0,
+            "weather_delay_days": 0.5,
+        }
+
+        # 1. Negative BDI
+        p1 = dict(base, scenario_changes={"bdi": -100})
+        self.assertEqual(self.client.post("/predict/scenario", json=p1).status_code, 422)
+
+        # 2. Cyclone risk > 5
+        p2 = dict(base, scenario_changes={"cyclone_risk": 7.0})
+        self.assertEqual(self.client.post("/predict/scenario", json=p2).status_code, 422)
+
+        # 3. Negative bunker price
+        p3 = dict(base, scenario_changes={"vlsfo_usd_per_tonne": -50.0})
+        self.assertEqual(self.client.post("/predict/scenario", json=p3).status_code, 422)
+
+    def test_scenario_simulation_all_5_routes(self):
+        routes = [
+            ("Australia West Coast", "East Coast India", "Iron Ore", "Capesize", 10.0),
+            ("Hay Point", "East Coast India", "Coal", "Capesize", 14.0),
+            ("Hay Point", "East Coast India", "Coal", "Panamax", 16.5),
+            ("Taboneo", "East Coast India", "Thermal Coal", "Panamax", 11.0),
+            ("Taboneo", "East Coast India", "Thermal Coal", "Supramax", 12.0),
+        ]
+        for origin, dest, comm, vessel, curr in routes:
+            payload = {
+                "origin": origin,
+                "destination": dest,
+                "commodity": comm,
+                "vessel_type": vessel,
+                "current_freight_usd_per_tonne": curr,
+                "bdi": 1560.0,
+                "vlsfo_usd_per_tonne": 638.0,
+                "coal_price_usd_per_mt": 124.0,
+                "iron_ore_price_usd_per_dmt": 124.0,
+                "wind_kmh": 32.0,
+                "wave_height_m": 2.0,
+                "cyclone_risk": 2.0,
+                "weather_delay_days": 0.5,
+                "scenario_changes": {
+                    "vlsfo_change_percent": 15.0,
+                    "wind_kmh": 45.0,
+                },
+            }
+            resp = self.client.post("/predict/scenario", json=payload)
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertIn("summary", data)
+            self.assertIn("baseline", data)
+            self.assertIn("scenario", data)
+            self.assertIn("impact", data)
+            self.assertEqual(len(data["changes"]), 2)
 
 
 class TestPredictionSafetyAndBounds(unittest.TestCase):

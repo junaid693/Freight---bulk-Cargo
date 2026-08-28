@@ -29,7 +29,7 @@ if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
 from data import database
-from predict import FEATURES, MODEL_PATH, predict_freight
+from predict import FEATURE_METADATA, FEATURES, MODEL_PATH, predict_freight
 
 
 # Default freshness thresholds
@@ -91,7 +91,7 @@ def _fill_weather(merged: dict, sources: dict, port: str) -> None:
         "weather_delay_days": weather.get("weather_delay_days"),
     }
     fetched_at = weather.get("fetched_at", "")
-    
+
     # Calculate age and freshness tag
     dt = _parse_iso_utc(fetched_at)
     if dt:
@@ -222,6 +222,216 @@ def forecast(user_input: dict) -> dict:
     )
 
     return result
+
+
+def run_scenario_forecast(user_input: dict) -> dict:
+    """Execute a what-if scenario simulation against Model v3.
+
+    Calculates both baseline and scenario forecasts using the same underlying pipeline,
+    computes comparative impact metrics, and verifies safety constraints.
+    """
+    start_time = time.perf_counter()
+
+    # 1. Build and run baseline forecast
+    base_merged, base_sources = build_forecast_input(user_input)
+    baseline_result = predict_freight(base_merged)
+    baseline_result["sources"] = base_sources
+
+    # 2. Extract and validate scenario modifications
+    scenario_changes_input = user_input.get("scenario_changes")
+    if hasattr(scenario_changes_input, "model_dump"):
+        scen_dict = scenario_changes_input.model_dump(exclude_none=True)
+    elif isinstance(scenario_changes_input, dict):
+        scen_dict = {k: v for k, v in scenario_changes_input.items() if v is not None}
+    else:
+        scen_dict = {}
+
+    scen_merged = dict(base_merged)
+    scen_sources = dict(base_sources)
+    changes_list = []
+
+    # Mapping of scenario keys to (target_feature, is_relative, change_type)
+    param_map = {
+        "bdi": ("bdi", False),
+        "bdi_change_percent": ("bdi", True),
+        "vlsfo_usd_per_tonne": ("vlsfo_usd_per_tonne", False),
+        "vlsfo_change_percent": ("vlsfo_usd_per_tonne", True),
+        "coal_price_usd_per_mt": ("coal_price_usd_per_mt", False),
+        "coal_price_change_percent": ("coal_price_usd_per_mt", True),
+        "iron_ore_price_usd_per_dmt": ("iron_ore_price_usd_per_dmt", False),
+        "iron_ore_price_change_percent": ("iron_ore_price_usd_per_dmt", True),
+        "wind_kmh": ("wind_kmh", False),
+        "wind_change_percent": ("wind_kmh", True),
+        "wave_height_m": ("wave_height_m", False),
+        "wave_height_change_percent": ("wave_height_m", True),
+        "cyclone_risk": ("cyclone_risk", False),
+        "cyclone_risk_change": ("cyclone_risk", "delta"),
+        "weather_delay_days": ("weather_delay_days", False),
+        "weather_delay_change_percent": ("weather_delay_days", True),
+        "current_freight_usd_per_tonne": ("current_freight_usd_per_tonne", False),
+        "current_freight_change_percent": ("current_freight_usd_per_tonne", True),
+    }
+
+    # Disallowed modifications
+    for forbidden in ["origin", "destination", "commodity", "vessel_type"]:
+        if forbidden in scen_dict:
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Modifying trade lane category '{forbidden}' is not supported in scenario analysis.",
+                detail="Scenario analysis tests market and weather shocks on an established trade lane.",
+            )
+
+    # Process each provided scenario change
+    processed_features = set()
+
+    for key, mod_val in scen_dict.items():
+        if key not in param_map:
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Unrecognized scenario parameter: '{key}'.",
+                detail="Supported scenario parameters include bdi, vlsfo_usd_per_tonne, cyclone_risk, etc. (absolute and percent changes).",
+            )
+
+        target_feat, mode = param_map[key]
+        if target_feat in processed_features:
+            continue  # Avoid duplicate overrides on same feature
+
+        base_val = float(base_merged[target_feat])
+        label, unit = FEATURE_METADATA.get(target_feat, (target_feat.replace("_", " ").title(), ""))
+
+        if mode is False:  # Absolute override
+            new_val = float(mod_val)
+            pct_change = round((new_val - base_val) / base_val * 100.0, 2) if base_val > 0 else None
+            prov_tag = f"scenario[={new_val}]"
+        elif mode is True:  # Relative percent shock
+            pct_change = float(mod_val)
+            new_val = base_val * (1.0 + pct_change / 100.0)
+            prov_tag = f"scenario[{pct_change:+.1f}%]"
+        elif mode == "delta":  # Absolute score delta (e.g. +2 points on cyclone)
+            new_val = base_val + float(mod_val)
+            pct_change = round((new_val - base_val) / base_val * 100.0, 2) if base_val > 0 else None
+            prov_tag = f"scenario[{float(mod_val):+.1f}pts]"
+
+        # Safety Validation per feature
+        if target_feat == "bdi" and new_val <= 0:
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Simulated BDI must be strictly positive (>0), got {new_val:.2f}.",
+                detail="BDI values cannot be zero or negative.",
+            )
+        if target_feat in {"vlsfo_usd_per_tonne", "coal_price_usd_per_mt", "iron_ore_price_usd_per_dmt"} and new_val < 0:
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Simulated price for {target_feat} cannot be negative, got {new_val:.2f}.",
+                detail="Commodity and bunker prices must be >= 0.",
+            )
+        if target_feat in {"wind_kmh", "wave_height_m", "weather_delay_days"} and new_val < 0:
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Simulated weather parameter {target_feat} cannot be negative, got {new_val:.2f}.",
+                detail="Weather parameters must be >= 0.",
+            )
+        if target_feat == "cyclone_risk" and not (0.0 <= new_val <= 5.0):
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Simulated cyclone risk score must be between 0 and 5, got {new_val:.2f}.",
+                detail="Cyclone alert index operates on a 0-5 scale.",
+            )
+        if target_feat == "current_freight_usd_per_tonne" and new_val <= 0:
+            raise ForecastDataError(
+                error_code="INVALID_SCENARIO_INPUT",
+                message=f"Simulated base freight must be strictly positive (>0), got {new_val:.2f}.",
+                detail="Current freight rate must be > 0.",
+            )
+
+        scen_merged[target_feat] = new_val
+        scen_sources[target_feat] = prov_tag
+        processed_features.add(target_feat)
+
+        changes_list.append({
+            "feature": target_feat,
+            "feature_label": label,
+            "baseline": round(base_val, 2),
+            "scenario": round(new_val, 2),
+            "absolute_change": round(new_val - base_val, 2),
+            "percentage_change": pct_change,
+            "unit": unit,
+        })
+
+    # Limit check (maximum 5 simultaneous parameter changes for hackathon safety)
+    if len(changes_list) > 5:
+        raise ForecastDataError(
+            error_code="INVALID_SCENARIO_INPUT",
+            message=f"A maximum of 5 scenario modifications is supported per request, received {len(changes_list)}.",
+            detail="Reduce the number of modified scenario parameters.",
+        )
+
+    # 3. Run scenario forecast
+    scenario_result = predict_freight(scen_merged)
+    scenario_result["sources"] = scen_sources
+
+    # 4. Compute comparative impact metrics
+    base_pred_rate = baseline_result["predicted_next_month_freight_usd_per_tonne"]
+    scen_pred_rate = scenario_result["predicted_next_month_freight_usd_per_tonne"]
+
+    diff_usd = round(scen_pred_rate - base_pred_rate, 2)
+    diff_pct = round((diff_usd / base_pred_rate) * 100.0, 2) if base_pred_rate > 0 else 0.0
+
+    base_risk = baseline_result["risk_level"]
+    scen_risk = scenario_result["risk_level"]
+    risk_shift = f"{base_risk} -> {scen_risk}" if base_risk != scen_risk else f"{base_risk} (unchanged)"
+
+    base_rec = baseline_result["recommendation"]
+    scen_rec = scenario_result["recommendation"]
+    rec_shift = f"{base_rec} -> {scen_rec}" if base_rec != scen_rec else f"{base_rec} (unchanged)"
+
+    impact = {
+        "difference_usd_per_tonne": diff_usd,
+        "difference_percent": diff_pct,
+        "baseline_change_percent": baseline_result["forecast_change_percent"],
+        "scenario_change_percent": scenario_result["forecast_change_percent"],
+        "risk_level_shift": risk_shift,
+        "recommendation_shift": rec_shift,
+    }
+
+    # 5. Formulate dynamic natural language executive summary
+    if not changes_list:
+        summary = (
+            f"No scenario modifications applied. Forecast remains identical to baseline at "
+            f"${base_pred_rate:.2f}/t ({baseline_result['forecast_change_percent']:+.2f}%)."
+        )
+    else:
+        shift_str = f"+${diff_usd:.2f}/t (+{diff_pct:.2f}%)" if diff_usd >= 0 else f"-${abs(diff_usd):.2f}/t ({diff_pct:.2f}%)"
+        rec_comment = f" Recommendation shifts from {base_rec} to {scen_rec}." if base_rec != scen_rec else f" Recommendation remains {base_rec}."
+        summary = (
+            f"Under this scenario, the next-month freight forecast shifts by {shift_str} "
+            f"from ${base_pred_rate:.2f}/t (baseline) to ${scen_pred_rate:.2f}/t.{rec_comment}"
+        )
+
+    # 6. Record scenario telemetry (isolated from baseline production stats)
+    latency_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+    database.insert_prediction_log(
+        model_version=MODEL_PATH.stem,
+        origin=str(base_merged.get("origin", "")),
+        destination=str(base_merged.get("destination", "")),
+        commodity=str(base_merged.get("commodity", "")),
+        vessel_type=str(base_merged.get("vessel_type", "")),
+        current_freight_usd_per_tonne=float(scenario_result.get("current_freight_usd_per_tonne", 0.0)),
+        predicted_next_month_freight_usd_per_tonne=float(scen_pred_rate),
+        forecast_change_percent=float(scenario_result.get("forecast_change_percent", 0.0)),
+        risk_level=str(scen_risk),
+        recommendation=str(scen_rec),
+        latency_ms=latency_ms,
+        provenance={"type": "scenario_simulation", "diff_usd": diff_usd, "changes_count": len(changes_list)},
+    )
+
+    return {
+        "summary": summary,
+        "baseline": baseline_result,
+        "scenario": scenario_result,
+        "impact": impact,
+        "changes": changes_list,
+    }
 
 
 def init_data_layer() -> None:

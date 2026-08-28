@@ -1,4 +1,4 @@
-"""FastAPI application exposing the FINAL freight forecasting model.
+"""FastAPI application exposing Model v3 freight forecasting and scenario simulation.
 
 Run locally:
     cd backend
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Make the backend root importable so `from data...` and `from services...`
@@ -25,7 +25,7 @@ if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
 from data import database
-from predict import FEATURES, get_model, MODEL_PATH
+from predict import FEATURES, get_model, get_model_metadata, MODEL_PATH
 from schemas import (
     DataStatus,
     ErrorResponse,
@@ -33,9 +33,16 @@ from schemas import (
     FreightResponse,
     LatestData,
     MarketQuoteOut,
+    ScenarioRequest,
+    ScenarioResponse,
     WeatherSnapshot,
 )
-from services.forecast_service import forecast, init_data_layer
+from services.forecast_service import (
+    ForecastDataError,
+    forecast,
+    init_data_layer,
+    run_scenario_forecast,
+)
 
 
 @asynccontextmanager
@@ -48,63 +55,53 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Freight Forecasting API",
+    title="Freight Forecasting API (Model v3)",
     description=(
-        "Forecast next-month bulk-cargo freight rates (USD/tonne) using Model v3 "
-        "(Bounded Residual Ridge Regression). Weather data is fetched from Open-Meteo "
-        "and cached in SQLite; market/freight sources are pluggable. "
-        "The model uses 13 input features (no cargo_tonnes) trained on 110 real observations."
+        "Production inference & what-if scenario API for Model v3 (Bounded Residual Ridge Regression). "
+        "Forecasts next-month dry bulk ocean freight rates (USD/tonne) and generates "
+        "weather-risk based chartering recommendations with closed-form mathematical explainability."
     ),
     version="3.0.0",
     lifespan=lifespan,
 )
 
-# Allow a local frontend (any localhost port) to call the API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8000",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:8000",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve the static frontend (single-page HTML) at /
 _STATIC_DIR = _BACKEND_ROOT / "static"
 
 
 # --------------------------------------------------------------------------- #
-# Health, model info, and data
+# Health & info
 # --------------------------------------------------------------------------- #
 @app.get("/health")
 def health():
-    """Health check used by load balancers / uptime monitors."""
     return {"status": "ok"}
 
 
 @app.get("/model/info")
 def model_info():
-    """Return metadata about the active model."""
-    from predict import get_model_metadata
+    """Return runtime metadata for the currently active production model."""
     return get_model_metadata()
 
 
+# --------------------------------------------------------------------------- #
+# Data status & latest values
+# --------------------------------------------------------------------------- #
 @app.get("/data/status", response_model=DataStatus)
 def data_status():
-    """Report when each data category was last updated."""
+    """Return the last_updated ISO-8601 timestamp for weather, market, and freight."""
     return database.get_data_status()
 
 
 @app.get("/data/latest", response_model=LatestData)
 def data_latest():
-    """Return the latest stored weather, market and freight data."""
+    """Return the most recent stored snapshot for weather, market, and freight."""
     weather = database.get_all_latest_weather()
     market_map = database.get_latest_market()
     market = [
@@ -133,7 +130,7 @@ def data_latest():
 
 
 # --------------------------------------------------------------------------- #
-# Prediction & Telemetry
+# Prediction, Explainability & Scenario Simulation
 # --------------------------------------------------------------------------- #
 @app.post(
     "/predict",
@@ -149,9 +146,6 @@ def predict(req: FreightRequest):
 
     Model v3 uses exactly 13 features (NO cargo_tonnes).
     """
-    from fastapi.responses import JSONResponse
-    from services.forecast_service import ForecastDataError
-
     try:
         return forecast(req.model_dump(exclude_unset=False))
     except ForecastDataError as exc:
@@ -190,6 +184,60 @@ def predict(req: FreightRequest):
             content={
                 "error_code": "INTERNAL_SERVER_ERROR",
                 "message": "An unexpected error occurred during forecasting.",
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+
+
+@app.post(
+    "/predict/scenario",
+    response_model=ScenarioResponse,
+    responses={422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
+def predict_scenario(req: ScenarioRequest):
+    """Execute a what-if scenario simulation comparing baseline to modified market/weather shocks.
+
+    Reuses the exact Model v3 inference pipeline.
+    """
+    try:
+        return run_scenario_forecast(req.model_dump(exclude_unset=False))
+    except ForecastDataError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "missing_fields": exc.missing_fields,
+                "detail": exc.detail,
+            },
+        )
+    except FileNotFoundError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error_code": "MODEL_UNAVAILABLE",
+                "message": "Model artifact not found on server.",
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "INVALID_SCENARIO_INPUT",
+                "message": str(exc),
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error_code": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected error occurred during scenario simulation.",
                 "missing_fields": [],
                 "detail": str(exc),
             },
