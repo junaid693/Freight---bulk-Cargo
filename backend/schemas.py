@@ -6,26 +6,35 @@ from pydantic import BaseModel, Field
 
 
 class FreightRequest(BaseModel):
-    """Forecast request.
+    """Forecast request for the FINAL model (freight_forecast_model_final.joblib).
 
-    Identity fields (origin, destination, commodity, vessel_type, cargo_tonnes)
-    are ALWAYS required - they identify the scenario.
+    The final model uses 13 input features (NO cargo_tonnes - it was
+    intentionally excluded because cargo values were representative
+    vessel capacities, not observed shipment quantities).
 
-    Every other field is OPTIONAL: if omitted, the service fills it from the
-    SQLite database (latest weather for the origin port, latest market
-    quotes, latest freight observation for the route). If a field still
-    cannot be resolved, the API returns a 422 listing the missing fields.
+    Required fields (identity + current freight):
+        origin, destination, commodity, vessel_type, current_freight_usd_per_tonne
 
-    Sending all fields reproduces the original /predict behaviour exactly
-    (backward compatible).
+    Optional fields (filled from the data layer if omitted):
+        bdi, vlsfo_usd_per_tonne, coal_price_usd_per_mt,
+        iron_ore_price_usd_per_dmt, wind_kmh, wave_height_m,
+        cyclone_risk, weather_delay_days
+
+    If an optional field cannot be resolved from the database AND the user
+    has not supplied it, the API returns a 422 listing the missing fields.
+    No values are fabricated.
     """
 
     # --- identity (required) ---
-    origin: str = Field(..., description="Loading port name, e.g. 'Hay Point'")
-    destination: str = Field(..., description="Discharge port name, e.g. 'Visakhapatnam'")
+    origin: str = Field(..., description="Loading port/region, e.g. 'Hay Point'")
+    destination: str = Field(..., description="Discharge port/region, e.g. 'East Coast India'")
     commodity: str = Field(..., description="Cargo commodity, e.g. 'Coal'")
     vessel_type: str = Field(..., description="Vessel class, e.g. 'Panamax'")
-    cargo_tonnes: float = Field(..., gt=0, description="Cargo size in metric tonnes")
+
+    # --- current freight (required - the model's primary numeric signal) ---
+    current_freight_usd_per_tonne: float = Field(
+        ..., gt=0, description="Current freight rate (USD/tonne)"
+    )
 
     # --- market (optional, filled from market_data if omitted) ---
     bdi: Optional[float] = Field(default=None, description="Baltic Dry Index value")
@@ -49,28 +58,22 @@ class FreightRequest(BaseModel):
         default=None, ge=0, description="Expected weather delay (days)"
     )
 
-    # --- current rate (optional, filled from freight_observations if omitted) ---
-    current_freight_usd_per_tonne: Optional[float] = Field(
-        default=None, gt=0, description="Current freight rate (USD/tonne)"
-    )
-
     model_config = {
         "json_schema_extra": {
             "example": {
                 "origin": "Hay Point",
-                "destination": "Visakhapatnam",
+                "destination": "East Coast India",
                 "commodity": "Coal",
                 "vessel_type": "Panamax",
-                "cargo_tonnes": 75000,
-                "bdi": 1200,
-                "vlsfo_usd_per_tonne": 600,
-                "coal_price_usd_per_mt": 130,
-                "iron_ore_price_usd_per_dmt": 115,
-                "wind_kmh": 25,
-                "wave_height_m": 2.5,
+                "current_freight_usd_per_tonne": 16.5,
+                "bdi": 1560,
+                "vlsfo_usd_per_tonne": 638,
+                "coal_price_usd_per_mt": 124,
+                "iron_ore_price_usd_per_dmt": 124,
+                "wind_kmh": 32,
+                "wave_height_m": 2.0,
                 "cyclone_risk": 2,
-                "weather_delay_days": 1.5,
-                "current_freight_usd_per_tonne": 28,
+                "weather_delay_days": 0.5,
             }
         }
     }
@@ -105,22 +108,21 @@ class FreightResponse(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "predicted_next_month_freight_usd_per_tonne": 21.07,
-                "current_freight_usd_per_tonne": 28.0,
-                "forecast_change_percent": -24.75,
+                "predicted_next_month_freight_usd_per_tonne": 17.32,
+                "current_freight_usd_per_tonne": 16.5,
+                "forecast_change_percent": 4.97,
                 "risk_level": "MEDIUM",
-                "recommendation": "WAIT",
-                "reason": "Forecast indicates freight rates will drop by 24.75%. "
-                "Waiting could secure lower rates.",
+                "recommendation": "MONITOR",
+                "reason": "Freight rates are expected to remain stable (+4.97%). Continue monitoring the market.",
                 "sources": {
                     "origin": "user",
                     "destination": "user",
                     "commodity": "user",
                     "vessel_type": "user",
-                    "cargo_tonnes": "user",
-                    "wind_kmh": "weather_db[Hay Point@2026-08-27T17:00:00Z]",
-                    "wave_height_m": "weather_db[Hay Point@2026-08-27T17:00:00Z]",
                     "current_freight_usd_per_tonne": "user",
+                    "wind_kmh": "weather_db[Hay Point@2026-08-27T17:14:09Z]",
+                    "wave_height_m": "weather_db[Hay Point@2026-08-27T17:14:09Z]",
+                    "bdi": "user",
                 },
             }
         }

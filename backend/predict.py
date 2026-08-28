@@ -1,8 +1,13 @@
 """Model loading and freight forecasting logic.
 
-Uses the existing trained model file `freight_forecast_model_v1.joblib`
+Uses the FINAL trained model file `freight_forecast_model_final.joblib`
 (located at the repository root). The model file is never modified or
 retrained - it is only loaded for inference.
+
+The final model (HistGradientBoostingRegressor inside an sklearn Pipeline)
+uses exactly 13 input features (NO cargo_tonnes - the final model
+intentionally excludes it because cargo values were representative
+vessel capacities, not observed shipment quantities).
 """
 
 from pathlib import Path
@@ -12,15 +17,16 @@ import pandas as pd
 
 # Repository root is the parent of this backend/ directory.
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = REPO_ROOT / "freight_forecast_model_v1.joblib"
+MODEL_PATH = REPO_ROOT / "freight_forecast_model_final.joblib"
 
-# Exact feature order expected by the trained pipeline (model.feature_names_in_).
+# Exact 13-feature contract expected by the final model pipeline
+# (verified from model.feature_names_in_). cargo_tonnes is intentionally
+# ABSENT - the final model was trained without it.
 FEATURES = [
     "origin",
     "destination",
     "commodity",
     "vessel_type",
-    "cargo_tonnes",
     "bdi",
     "vlsfo_usd_per_tonne",
     "coal_price_usd_per_mt",
@@ -100,7 +106,7 @@ def predict_freight(data: dict) -> dict:
     """Run a single freight forecast.
 
     Args:
-        data: dict containing all 14 model input features.
+        data: dict containing all 13 model input features.
 
     Returns:
         dict with the prediction, risk level, recommendation and reason.

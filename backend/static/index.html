@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freight Forecast — Bulk Cargo</title>
+<style>
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #334155;
+  --border: #475569;
+  --text: #f1f5f9;
+  --text-dim: #94a3b8;
+  --accent: #38bdf8;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --radius: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; padding: 20px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.container { max-width: 900px; width: 100%; }
+header { text-align: center; margin-bottom: 30px; }
+header h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
+header p { color: var(--text-dim); margin-top: 6px; font-size: 0.95rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+}
+.card h2 { font-size: 1.1rem; margin-bottom: 16px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-field.full { grid-column: 1 / -1; }
+.form-field label { font-size: 0.8rem; color: var(--text-dim); font-weight: 500; }
+.form-field select, .form-field input {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+.form-field select:focus, .form-field input:focus { outline: none; border-color: var(--accent); }
+.form-field input[type="number"] { width: 100%; }
+.form-field .hint { font-size: 0.7rem; color: var(--text-dim); font-style: italic; }
+.section-divider { grid-column: 1 / -1; border-top: 1px solid var(--border); margin: 8px 0; padding-top: 8px; }
+.section-divider span { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+button.predict {
+  width: 100%; padding: 14px; background: var(--accent); color: var(--bg);
+  border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 700;
+  cursor: pointer; transition: opacity 0.15s; margin-top: 16px;
+}
+button.predict:hover { opacity: 0.9; }
+button.predict:disabled { opacity: 0.5; cursor: not-allowed; }
+.result-card { display: none; }
+.result-card.show { display: block; }
+.result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.result-metric { text-align: center; }
+.result-metric .label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.result-metric .value { font-size: 1.6rem; font-weight: 700; }
+.result-metric .sub { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+.reco-banner {
+  padding: 16px; border-radius: var(--radius); text-align: center;
+  font-size: 1.2rem; font-weight: 700; margin-bottom: 16px;
+}
+.reco-CHARTER { background: rgba(248,113,113,0.15); border: 1px solid var(--red); color: var(--red); }
+.reco-WAIT { background: rgba(74,222,128,0.15); border: 1px solid var(--green); color: var(--green); }
+.reco-MONITOR { background: rgba(251,191,36,0.15); border: 1px solid var(--amber); color: var(--amber); }
+.reason { font-size: 0.9rem; color: var(--text-dim); text-align: center; margin-bottom: 20px; line-height: 1.4; }
+.sources-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.75rem; }
+.sources-grid .src { display: flex; justify-content: space-between; padding: 4px 8px; background: var(--surface-2); border-radius: 4px; }
+.sources-grid .src .field { color: var(--text-dim); }
+.sources-grid .src .prov { color: var(--accent); font-family: monospace; font-size: 0.7rem; }
+.error-msg { display: none; padding: 12px; background: rgba(248,113,113,0.1); border: 1px solid var(--red); border-radius: var(--radius); color: var(--red); font-size: 0.85rem; }
+.error-msg.show { display: block; }
+.status-bar { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; font-size: 0.75rem; color: var(--text-dim); }
+.status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 4px; }
+.status-bar .dot.off { background: var(--text-dim); }
+footer { text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 30px; }
+@media (max-width: 600px) {
+  .form-grid, .result-grid { grid-template-columns: 1fr; }
+  .sources-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Freight Forecast</h1>
+    <p>Bulk-cargo freight rate forecasting with weather-risk chartering recommendations</p>
+  </header>
+
+  <div class="status-bar" id="statusBar">
+    <span><span class="dot off" id="dotApi"></span>API</span>
+    <span><span class="dot off" id="dotWeather"></span>Weather DB</span>
+    <span><span class="dot off" id="dotMarket"></span>Market DB</span>
+  </div>
+
+  <div class="card">
+    <h2>Forecast Request</h2>
+    <div class="form-grid">
+      <div class="form-field">
+        <label>Origin</label>
+        <select id="origin">
+          <option value="Hay Point">Hay Point (Australia East)</option>
+          <option value="Taboneo">Taboneo (Indonesia)</option>
+          <option value="Australia West Coast">Australia West Coast</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Destination</label>
+        <select id="destination">
+          <option value="East Coast India">East Coast India</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Commodity</label>
+        <select id="commodity">
+          <option value="Coal">Coal</option>
+          <option value="Thermal Coal">Thermal Coal</option>
+          <option value="Iron Ore">Iron Ore</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Vessel Type</label>
+        <select id="vessel_type">
+          <option value="Panamax">Panamax</option>
+          <option value="Supramax">Supramax</option>
+          <option value="Capesize">Capesize</option>
+        </select>
+      </div>
+      <div class="form-field full">
+        <label>Current Freight Rate (USD / tonne) *</label>
+        <input type="number" id="current_freight" step="0.1" min="0" value="16.5" placeholder="e.g. 16.5">
+      </div>
+
+      <div class="section-divider"><span>Optional — leave blank to auto-fill from database</span></div>
+
+      <div class="form-field">
+        <label>BDI (Baltic Dry Index)</label>
+        <input type="number" id="bdi" step="1" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>VLSFO (USD / tonne)</label>
+        <input type="number" id="vlsfo" step="1" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>Coal Price (USD / MT)</label>
+        <input type="number" id="coal_price" step="0.1" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>Iron Ore Price (USD / dmt)</label>
+        <input type="number" id="iron_ore" step="0.1" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>Wind Speed (km/h)</label>
+        <input type="number" id="wind_kmh" step="0.1" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>Wave Height (m)</label>
+        <input type="number" id="wave_height" step="0.1" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>Cyclone Risk (0–5)</label>
+        <input type="number" id="cyclone_risk" step="0.1" min="0" max="5" placeholder="auto">
+      </div>
+      <div class="form-field">
+        <label>Weather Delay (days)</label>
+        <input type="number" id="weather_delay" step="0.1" min="0" placeholder="auto">
+      </div>
+    </div>
+    <button class="predict" id="predictBtn" onclick="predict()">Forecast Next-Month Rate →</button>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <div class="card result-card" id="resultCard">
+    <h2>Forecast Result</h2>
+    <div class="reco-banner" id="recoBanner"></div>
+    <div class="reason" id="reasonText"></div>
+    <div class="result-grid">
+      <div class="result-metric">
+        <div class="label">Predicted Next Month</div>
+        <div class="value" id="predValue" style="color: var(--accent);"></div>
+        <div class="sub">USD / tonne</div>
+      </div>
+      <div class="result-metric">
+        <div class="label">Current Rate</div>
+        <div class="value" id="currValue"></div>
+        <div class="sub">USD / tonne</div>
+      </div>
+      <div class="result-metric">
+        <div class="label">Forecast Change</div>
+        <div class="value" id="changeValue"></div>
+        <div class="sub" id="riskLevel"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card result-card" id="sourcesCard">
+    <h2>Data Provenance</h2>
+    <div class="sources-grid" id="sourcesGrid"></div>
+  </div>
+
+  <footer>
+    Powered by freight_forecast_model_final (HistGradientBoosting) · 13 features · No cargo_tonnes
+  </footer>
+</div>
+
+<script>
+// Detect if we're behind the gateway (XTransformPort in URL) and preserve it
+const urlParams = new URLSearchParams(window.location.search);
+const _xtp = urlParams.get('XTransformPort');
+const API = _xtp ? `?XTransformPort=${_xtp}` : '';
+// Helper to append XTransformPort to any API path
+function apiUrl(path) {
+  return _xtp ? `${path}?XTransformPort=${_xtp}` : path;
+}
+
+async function checkStatus() {
+  try {
+    const r = await fetch(apiUrl('/health'));
+    if (r.ok) document.getElementById('dotApi').classList.remove('off');
+  } catch(e) {}
+  try {
+    const r = await fetch(apiUrl('/data/status'));
+    const d = await r.json();
+    if (d.weather) document.getElementById('dotWeather').classList.remove('off');
+    if (d.market) document.getElementById('dotMarket').classList.remove('off');
+  } catch(e) {}
+}
+
+async function predict() {
+  const btn = document.getElementById('predictBtn');
+  const errEl = document.getElementById('errorMsg');
+  const resultCard = document.getElementById('resultCard');
+  const sourcesCard = document.getElementById('sourcesCard');
+  btn.disabled = true; btn.textContent = 'Forecasting...';
+  errEl.classList.remove('show'); resultCard.classList.remove('show'); sourcesCard.classList.remove('show');
+
+  const payload = {
+    origin: document.getElementById('origin').value,
+    destination: document.getElementById('destination').value,
+    commodity: document.getElementById('commodity').value,
+    vessel_type: document.getElementById('vessel_type').value,
+    current_freight_usd_per_tonne: parseFloat(document.getElementById('current_freight').value),
+  };
+  // optional fields — only include if user entered a value
+  const optFields = [
+    ['bdi', 'bdi'], ['vlsfo', 'vlsfo_usd_per_tonne'],
+    ['coal_price', 'coal_price_usd_per_mt'], ['iron_ore', 'iron_ore_price_usd_per_dmt'],
+    ['wind_kmh', 'wind_kmh'], ['wave_height', 'wave_height_m'],
+    ['cyclone_risk', 'cyclone_risk'], ['weather_delay', 'weather_delay_days'],
+  ];
+  for (const [id, key] of optFields) {
+    const v = document.getElementById(id).value;
+    if (v !== '') payload[key] = parseFloat(v);
+  }
+
+  try {
+    const r = await fetch(apiUrl('/predict'), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      errEl.textContent = 'Error ' + r.status + ': ' + (data.detail || JSON.stringify(data));
+      errEl.classList.add('show');
+      return;
+    }
+    // Display results
+    document.getElementById('predValue').textContent = data.predicted_next_month_freight_usd_per_tonne.toFixed(2);
+    document.getElementById('currValue').textContent = data.current_freight_usd_per_tonne.toFixed(2);
+    const chg = data.forecast_change_percent;
+    const chgEl = document.getElementById('changeValue');
+    chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+    chgEl.style.color = chg >= 5 ? 'var(--red)' : chg <= -5 ? 'var(--green)' : 'var(--amber)';
+    document.getElementById('riskLevel').textContent = 'Risk: ' + data.risk_level;
+
+    const banner = document.getElementById('recoBanner');
+    banner.textContent = data.recommendation;
+    banner.className = 'reco-banner reco-' + data.recommendation.split(' ')[0];
+    document.getElementById('reasonText').textContent = data.reason;
+
+    // Sources
+    const sg = document.getElementById('sourcesGrid');
+    sg.innerHTML = '';
+    for (const [field, prov] of Object.entries(data.sources)) {
+      const div = document.createElement('div');
+      div.className = 'src';
+      div.innerHTML = '<span class="field">' + field + '</span><span class="prov">' + prov + '</span>';
+      sg.appendChild(div);
+    }
+    resultCard.classList.add('show');
+    sourcesCard.classList.add('show');
+  } catch(e) {
+    errEl.textContent = 'Network error: ' + e.message;
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Forecast Next-Month Rate →';
+  }
+}
+
+checkStatus();
+</script>
+</body>
+</html>
