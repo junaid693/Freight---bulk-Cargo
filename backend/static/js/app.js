@@ -1,12 +1,12 @@
 /**
  * Freight Intelligence Platform — Application Controller
- * High-Density Maritime Analytics & Model v3 Decision Engine
+ * Stitch UI Fidelity & Model v3 Decision Support Engine
  */
 
 import { API } from "./api.js";
 import { Charts } from "./charts.js";
 
-// Canonical 5 Trade Lanes Definition
+// Canonical 5 Trade Lanes Definition (Strict Enforcement)
 const CANONICAL_LANES = [
   {
     id: "lane-1",
@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initScenarioForm();
   initGlobalEvents();
 
-  // Load initial route
+  // Load initial route from window hash
   handleNavigation(window.location.hash.replace("#", "") || "overview");
 });
 
@@ -86,7 +86,7 @@ function initRouter() {
     handleNavigation(route);
   });
 
-  document.querySelectorAll(".nav-item a").forEach((link) => {
+  document.querySelectorAll(".nav-link").forEach((link) => {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       const targetRoute = link.getAttribute("data-route");
@@ -99,12 +99,11 @@ function handleNavigation(route) {
   state.currentRoute = route;
 
   // Update Nav Active State
-  document.querySelectorAll(".nav-item").forEach((item) => {
-    const link = item.querySelector("a");
-    if (link && link.getAttribute("data-route") === route) {
-      item.classList.add("active");
+  document.querySelectorAll(".nav-link").forEach((link) => {
+    if (link.getAttribute("data-route") === route) {
+      link.classList.add("active");
     } else {
-      item.classList.remove("active");
+      link.classList.remove("active");
     }
   });
 
@@ -121,12 +120,12 @@ function handleNavigation(route) {
   // Update Topbar Title
   const titleMap = {
     overview: "Overview Dashboard",
-    forecast: "Freight Forecast Engine",
+    forecast: "Freight Forecast",
     scenario: "What-If Scenario Simulation",
-    routes: "Route Intelligence & Benchmarks",
-    market: "Market Intelligence & Macro Trends",
-    weather: "Weather Intelligence & Maritime Risk",
-    sources: "Data Provenance & Model Validation",
+    routes: "Route Intelligence",
+    market: "Market Intelligence",
+    weather: "Weather Intelligence",
+    sources: "Data & Sources Provenance",
   };
   const titleEl = document.getElementById("topbar-page-title");
   if (titleEl) titleEl.textContent = titleMap[route] || "Freight Intelligence";
@@ -173,6 +172,7 @@ function initLaneSelectors() {
     topbarSelect.addEventListener("change", (e) => {
       state.selectedLaneIndex = Number(e.target.value);
       syncLaneAcrossForms();
+      if (state.currentRoute === "overview") loadOverview();
       if (state.currentRoute === "routes") loadRoutesScreen();
     });
   }
@@ -181,6 +181,9 @@ function initLaneSelectors() {
 function syncLaneAcrossForms() {
   const lane = CANONICAL_LANES[state.selectedLaneIndex];
   if (!lane) return;
+
+  const topbarSelect = document.getElementById("topbar-route-select");
+  if (topbarSelect) topbarSelect.value = state.selectedLaneIndex;
 
   // Sync Forecast Form
   const fcLaneSelect = document.getElementById("fc-lane-select");
@@ -192,9 +195,6 @@ function syncLaneAcrossForms() {
   // Sync Scenario Form
   const scLaneSelect = document.getElementById("sc-lane-select");
   if (scLaneSelect) scLaneSelect.value = state.selectedLaneIndex;
-
-  const scFreight = document.getElementById("sc-current-freight");
-  if (scFreight) scFreight.value = lane.defaultFreight.toFixed(2);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,18 +208,68 @@ async function loadOverview() {
     const data = await API.getDashboardOverview();
     state.overviewData = data;
 
-    // Macro KPIs
-    document.getElementById("ov-kpi-bdi").textContent = Number(data.market.bdi).toLocaleString();
-    document.getElementById("ov-kpi-vlsfo").textContent = `$${data.market.vlsfo_usd_per_tonne.toFixed(2)}`;
-    document.getElementById("ov-kpi-coal").textContent = `$${data.market.coal_price_usd_per_mt.toFixed(2)}`;
-    document.getElementById("ov-kpi-fe").textContent = `$${data.market.iron_ore_price_usd_per_dmt.toFixed(2)}`;
-    document.getElementById("ov-kpi-avg-freight").textContent = `$${data.market.average_freight_usd_per_tonne.toFixed(2)}`;
+    const selectedLane = CANONICAL_LANES[state.selectedLaneIndex];
+    const selectedRouteFc = (data.forecast && data.forecast.route_forecasts) 
+      ? (data.forecast.route_forecasts[state.selectedLaneIndex] || data.forecast.route_forecasts[0])
+      : null;
 
-    // Trend Pill
-    const trendEl = document.getElementById("ov-kpi-trend");
-    if (trendEl) {
-      trendEl.textContent = `${data.market.freight_trend_classification} (${data.market.shift_percent >= 0 ? "+" : ""}${data.market.shift_percent.toFixed(2)}%)`;
-      trendEl.className = `trend-pill trend-${data.market.freight_trend_classification.toLowerCase()}`;
+    // Top 6 KPIs
+    if (selectedRouteFc) {
+      document.getElementById("ov-kpi-current-freight").innerHTML = `$${selectedRouteFc.current_freight_usd_per_tonne.toFixed(2)}<span class="text-xs text-on-surface-variant ml-1 font-normal">/ t</span>`;
+      document.getElementById("ov-kpi-forecast").innerHTML = `$${selectedRouteFc.predicted_next_month_freight_usd_per_tonne.toFixed(2)}<span class="text-xs text-on-surface-variant ml-1 font-normal">/ t</span>`;
+      
+      const chg = selectedRouteFc.forecast_change_percent;
+      const isPos = chg >= 0;
+      const changeEl = document.getElementById("ov-kpi-change");
+      changeEl.textContent = `${isPos ? "+" : ""}${chg.toFixed(2)}%`;
+      changeEl.className = `font-kpi-value text-2xl mt-auto ${isPos ? "text-error" : "text-success-green"}`;
+
+      const sigBadge = document.getElementById("ov-kpi-signal");
+      sigBadge.textContent = selectedRouteFc.recommendation;
+      sigBadge.className = `reco-badge ${selectedRouteFc.recommendation === "CHARTER NOW" ? "reco-charter" : selectedRouteFc.recommendation === "WAIT" ? "reco-wait" : "reco-monitor"}`;
+
+      const riskBadge = document.getElementById("ov-kpi-weather-risk");
+      riskBadge.textContent = selectedRouteFc.risk_level;
+      riskBadge.className = `risk-badge ${selectedRouteFc.risk_level === "HIGH" ? "risk-high" : selectedRouteFc.risk_level === "MEDIUM" ? "risk-medium" : "risk-low"}`;
+    }
+
+    document.getElementById("ov-kpi-bdi").textContent = Number(data.market.bdi).toLocaleString();
+
+    // Map Route Labels
+    const mapOrigin = document.getElementById("ov-map-origin-label");
+    if (mapOrigin) mapOrigin.textContent = selectedLane.origin.toUpperCase();
+
+    const mapDest = document.getElementById("ov-map-dest-label");
+    if (mapDest) mapDest.textContent = selectedLane.destination.toUpperCase();
+
+    const mapTitle = document.getElementById("ov-map-route-title");
+    if (mapTitle) mapTitle.textContent = `${selectedLane.commodity} • ${selectedLane.vessel_type}`;
+
+    const mapSub = document.getElementById("ov-map-route-sub");
+    if (mapSub) mapSub.textContent = `${selectedLane.origin} → ${selectedLane.destination}`;
+
+    // Algorithm Recommendation Hero Card
+    if (selectedRouteFc) {
+      document.getElementById("ov-hero-reco").textContent = selectedRouteFc.recommendation;
+      document.getElementById("ov-hero-reason").textContent = (
+        data.forecast.reference_summary ||
+        `Model v3 projects next-month rates will move by ${selectedRouteFc.forecast_change_percent >= 0 ? '+' : ''}${selectedRouteFc.forecast_change_percent.toFixed(2)}% for ${selectedLane.origin} to ${selectedLane.destination}.`
+      );
+    }
+
+    // Market Snapshot
+    document.getElementById("ov-snap-bdi").textContent = Number(data.market.bdi).toLocaleString();
+    document.getElementById("ov-snap-vlsfo").textContent = `$${data.market.vlsfo_usd_per_tonne.toFixed(2)}/t`;
+    document.getElementById("ov-snap-coal").textContent = `$${data.market.coal_price_usd_per_mt.toFixed(2)}/MT`;
+    document.getElementById("ov-snap-fe").textContent = `$${data.market.iron_ore_price_usd_per_dmt.toFixed(2)}/dmt`;
+
+    // Weather Snapshot (match origin port)
+    const matchedWeather = (data.weather.ports || []).find(p => p.port === selectedLane.origin) || (data.weather.ports || [])[0];
+    if (matchedWeather) {
+      document.getElementById("ov-snap-wind").textContent = `${matchedWeather.wind_kmh.toFixed(1)} km/h`;
+      document.getElementById("ov-snap-wave").textContent = `${matchedWeather.wave_height_m.toFixed(1)} m`;
+      document.getElementById("ov-snap-cyclone").textContent = `${matchedWeather.cyclone_risk.toFixed(1)} / 5`;
+      document.getElementById("ov-snap-delay").textContent = `${matchedWeather.weather_delay_days.toFixed(1)} days`;
     }
 
     // 5 Routes Table
@@ -228,20 +278,19 @@ async function loadOverview() {
       routesTbody.innerHTML = data.routes.canonical_lanes.map((r, i) => {
         const fc = data.forecast.route_forecasts[i] || {};
         const recoClass = fc.recommendation === "CHARTER NOW" ? "reco-charter" : fc.recommendation === "WAIT" ? "reco-wait" : "reco-monitor";
+        const riskClass = fc.risk_level === "HIGH" ? "risk-high" : fc.risk_level === "MEDIUM" ? "risk-medium" : "risk-low";
         return `
-          <tr>
-            <td>
-              <div style="font-weight:600;">${r.origin} → ${r.destination}</div>
-              <small style="color:var(--text-muted);">${r.commodity} • ${r.vessel_type}</small>
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-4 whitespace-nowrap font-medium text-on-surface">${r.origin} → ${r.destination}</td>
+            <td class="py-3 px-4 text-on-surface-variant">${r.commodity}</td>
+            <td class="py-3 px-4 text-on-surface-variant">${r.vessel_type}</td>
+            <td class="py-3 px-4 font-mono-data text-right font-semibold">$${r.latest_freight.toFixed(2)}</td>
+            <td class="py-3 px-4 font-mono-data text-right text-primary font-semibold">$${fc.predicted_next_month_freight_usd_per_tonne ? fc.predicted_next_month_freight_usd_per_tonne.toFixed(2) : "--"}</td>
+            <td class="py-3 px-4 font-mono-data text-right ${r.latest_monthly_change >= 0 ? 'text-error' : 'text-success-green'}">
+              ${r.latest_monthly_change >= 0 ? '+' : ''}${r.latest_monthly_change_percent.toFixed(2)}%
             </td>
-            <td class="tabular-nums" style="font-family:var(--font-mono);font-weight:600;">$${r.latest_freight.toFixed(2)}</td>
-            <td class="tabular-nums" style="font-family:var(--font-mono);">$${fc.predicted_next_month_freight_usd_per_tonne ? fc.predicted_next_month_freight_usd_per_tonne.toFixed(2) : "--"}</td>
-            <td>
-              <span class="trend-pill ${r.latest_monthly_change >= 0 ? 'trend-up' : 'trend-down'}">
-                ${r.latest_monthly_change >= 0 ? '+' : ''}${r.latest_monthly_change_percent.toFixed(2)}%
-              </span>
-            </td>
-            <td>
+            <td class="py-3 px-4"><span class="risk-badge ${riskClass}">${fc.risk_level || 'LOW'}</span></td>
+            <td class="py-3 px-4 text-center">
               <span class="reco-badge ${recoClass}">${fc.recommendation || 'MONITOR'}</span>
             </td>
           </tr>
@@ -249,46 +298,19 @@ async function loadOverview() {
       }).join("");
     }
 
-    // Weather Port Cards
-    const weatherGrid = document.getElementById("ov-weather-grid");
-    if (weatherGrid && data.weather && data.weather.ports) {
-      weatherGrid.innerHTML = data.weather.ports.map((w) => {
-        const riskClass = w.risk_level === "HIGH" ? "risk-high" : w.risk_level === "MEDIUM" ? "risk-medium" : "risk-low";
-        return `
-          <div class="card" style="padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-weight:600;font-size:0.85rem;">${w.port}</span>
-              <span class="risk-badge ${riskClass}">${w.risk_level}</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.75rem;color:var(--text-secondary);">
-              <div>Wind: <span style="font-family:var(--font-mono);color:var(--text-primary);">${w.wind_kmh.toFixed(1)} km/h</span></div>
-              <div>Wave: <span style="font-family:var(--font-mono);color:var(--text-primary);">${w.wave_height_m.toFixed(1)} m</span></div>
-              <div>Cyclone: <span style="font-family:var(--font-mono);color:var(--text-primary);">${w.cyclone_risk.toFixed(1)}/5</span></div>
-              <div>Delay: <span style="font-family:var(--font-mono);color:var(--text-primary);">${w.weather_delay_days.toFixed(1)} d</span></div>
-            </div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    // Deterministic Signals List
-    const signalsList = document.getElementById("ov-signals-list");
-    if (signalsList && data.signals) {
-      signalsList.innerHTML = data.signals.map((sig) => {
-        const sevClass = sig.severity === "HIGH" ? "signal-high" : sig.severity === "MEDIUM" ? "signal-medium" : "signal-low";
-        const iconName = sig.severity === "HIGH" ? "warning" : sig.severity === "MEDIUM" ? "info" : "verified";
-        return `
-          <div class="signal-card ${sevClass}">
-            <div class="signal-icon-wrapper">
-              <span class="material-symbols-outlined" style="font-size:20px;">${iconName}</span>
-            </div>
-            <div class="signal-content">
-              <h4>${sig.title}</h4>
-              <p>${sig.description}</p>
-            </div>
-          </div>
-        `;
-      }).join("");
+    // Historical Trend Chart for selected route
+    const trendsData = await API.getFreightTrends({
+      origin: selectedLane.origin,
+      commodity: selectedLane.commodity,
+    });
+    const trendChartContainer = document.getElementById("ov-trend-chart-container");
+    if (trendChartContainer && trendsData.series) {
+      Charts.renderTimeSeries(trendChartContainer, trendsData.series, {
+        yKey: "freight_rate_usd_per_tonne",
+        xKey: "date",
+        strokeColor: "#7c5cfc",
+        height: 360,
+      });
     }
   } catch (err) {
     console.error("Failed to load overview dashboard:", err);
@@ -326,7 +348,6 @@ function initForecastForm() {
 async function loadForecastScreen() {
   syncLaneAcrossForms();
   await autoFillForecastInputs();
-  // Trigger default prediction if none yet
   if (!state.latestForecast) {
     await executeForecast();
   }
@@ -342,7 +363,7 @@ async function autoFillForecastInputs() {
       document.getElementById("fc-coal").value = m.coal_price_usd_per_mt;
       document.getElementById("fc-iron-ore").value = m.iron_ore_price_usd_per_dmt;
     }
-    // Default nominal weather
+    // Set standard weather benchmark
     document.getElementById("fc-wind").value = "28.5";
     document.getElementById("fc-wave").value = "1.8";
     document.getElementById("fc-cyclone").value = "1.5";
@@ -381,7 +402,7 @@ async function executeForecast() {
   try {
     const res = await API.predict(payload);
     state.latestForecast = res;
-    renderForecastResults(res);
+    renderForecastResults(res, payload.current_freight_usd_per_tonne);
   } catch (err) {
     alert(`Forecast Error [${err.errorCode}]: ${err.message}`);
   } finally {
@@ -389,13 +410,16 @@ async function executeForecast() {
   }
 }
 
-function renderForecastResults(res) {
-  document.getElementById("fc-res-forecast").textContent = `$${res.predicted_next_month_freight_usd_per_tonne.toFixed(2)}`;
+function renderForecastResults(res, currentRate) {
+  document.getElementById("fc-res-forecast").innerHTML = `$${res.predicted_next_month_freight_usd_per_tonne.toFixed(2)} <span class="text-lg text-on-surface-variant font-normal">/ t</span>`;
   
   const chgEl = document.getElementById("fc-res-change");
   const isPos = res.forecast_change_percent >= 0;
-  chgEl.textContent = `${isPos ? "+" : ""}${res.forecast_change_percent.toFixed(2)}% vs Current`;
-  chgEl.className = `trend-pill ${isPos ? "trend-up" : "trend-down"}`;
+  chgEl.innerHTML = `
+    <span class="material-symbols-outlined text-[14px]">${isPos ? 'arrow_upward' : 'arrow_downward'}</span>
+    ${isPos ? "+" : ""}${res.forecast_change_percent.toFixed(2)}%
+  `;
+  chgEl.className = `trend-pill ${isPos ? "trend-up" : "trend-down"} px-2 py-0.5 rounded-sm flex items-center gap-1`;
 
   const recoBadge = document.getElementById("fc-res-reco");
   recoBadge.textContent = res.recommendation;
@@ -408,10 +432,7 @@ function renderForecastResults(res) {
   document.getElementById("fc-res-reason").textContent = res.reason;
 
   // Render Explainability Section
-  if (res.explanation) {
-    const summaryEl = document.getElementById("fc-expl-summary");
-    if (summaryEl) summaryEl.textContent = res.explanation.summary;
-
+  if (res.explanation && res.explanation.drivers) {
     const waterfallEl = document.getElementById("fc-expl-waterfall");
     if (waterfallEl) {
       Charts.renderDriverWaterfall(waterfallEl, res.explanation.drivers);
@@ -515,14 +536,14 @@ async function runScenarioSimulation() {
 }
 
 function renderScenarioResults(res) {
-  // Baseline vs Scenario comparison
+  // Baseline vs Scenario
   document.getElementById("sc-base-val").textContent = `$${res.baseline.predicted_next_month_freight_usd_per_tonne.toFixed(2)}`;
   document.getElementById("sc-sim-val").textContent = `$${res.scenario.predicted_next_month_freight_usd_per_tonne.toFixed(2)}`;
 
   const diff = res.impact.difference_usd_per_tonne;
   const diffEl = document.getElementById("sc-diff-val");
   diffEl.textContent = `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)}/t (${res.impact.difference_percent >= 0 ? "+" : ""}${res.impact.difference_percent.toFixed(2)}%)`;
-  diffEl.className = `trend-pill ${diff >= 0 ? "trend-up" : "trend-down"}`;
+  diffEl.className = `trend-pill font-mono-data ${diff >= 0 ? "trend-up" : "trend-down"}`;
 
   document.getElementById("sc-risk-shift").textContent = res.impact.risk_level_shift;
   document.getElementById("sc-reco-shift").textContent = res.impact.recommendation_shift;
@@ -532,13 +553,13 @@ function renderScenarioResults(res) {
   const changesList = document.getElementById("sc-changes-list");
   if (changesList) {
     if (res.changes.length === 0) {
-      changesList.innerHTML = `<div style="color:var(--text-muted);font-size:0.8rem;">No parameter shocks applied (Baseline State).</div>`;
+      changesList.innerHTML = `<div class="text-on-surface-variant text-xs italic">No parameter shocks applied (Baseline State).</div>`;
     } else {
       changesList.innerHTML = res.changes.map((c) => `
-        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);font-size:0.82rem;">
-          <span style="color:var(--text-secondary);">${c.feature_label}</span>
-          <span style="font-family:var(--font-mono);font-weight:600;">
-            ${c.baseline.toFixed(1)} → <span style="color:var(--primary);">${c.scenario.toFixed(1)}</span> (${c.percentage_change >= 0 ? "+" : ""}${c.percentage_change ? c.percentage_change.toFixed(1) + "%" : ""})
+        <div class="flex justify-between py-1 border-b border-border-subtle text-xs">
+          <span class="text-on-surface">${c.feature_label}</span>
+          <span class="font-mono-data font-semibold">
+            ${c.baseline.toFixed(1)} → <span class="text-primary">${c.scenario.toFixed(1)}</span> (${c.percentage_change >= 0 ? "+" : ""}${c.percentage_change ? c.percentage_change.toFixed(1) + "%" : ""})
           </span>
         </div>
       `).join("");
@@ -556,21 +577,19 @@ async function loadRoutesScreen() {
 
     const tbody = document.getElementById("ri-routes-tbody");
     if (tbody && data.routes) {
-      tbody.innerHTML = data.routes.map((r, i) => `
-        <tr>
-          <td>
-            <div style="font-weight:600;">${r.origin} → ${r.destination}</div>
-            <small style="color:var(--text-muted);">${r.commodity} • ${r.vessel_type}</small>
+      tbody.innerHTML = data.routes.map((r) => `
+        <tr class="hover:bg-surface-container-low transition-colors">
+          <td class="py-3 px-4 whitespace-nowrap font-medium text-on-surface">
+            <div>${r.origin} → ${r.destination}</div>
+            <small class="text-on-surface-variant font-normal">${r.commodity} • ${r.vessel_type}</small>
           </td>
-          <td class="tabular-nums" style="font-family:var(--font-mono);font-weight:600;">$${r.latest_freight.toFixed(2)}</td>
-          <td class="tabular-nums" style="font-family:var(--font-mono);">$${r.average_freight.toFixed(2)}</td>
-          <td class="tabular-nums" style="font-family:var(--font-mono);">$${r.minimum_freight.toFixed(2)} – $${r.maximum_freight.toFixed(2)}</td>
-          <td>
-            <span class="trend-pill ${r.latest_monthly_change >= 0 ? 'trend-up' : 'trend-down'}">
-              ${r.latest_monthly_change >= 0 ? '+' : ''}${r.latest_monthly_change_percent.toFixed(2)}%
-            </span>
+          <td class="py-3 px-4 font-mono-data text-right font-bold text-on-surface">$${r.latest_freight.toFixed(2)}</td>
+          <td class="py-3 px-4 font-mono-data text-right text-on-surface-variant">$${r.average_freight.toFixed(2)}</td>
+          <td class="py-3 px-4 font-mono-data text-right text-on-surface-variant">$${r.minimum_freight.toFixed(2)} – $${r.maximum_freight.toFixed(2)}</td>
+          <td class="py-3 px-4 font-mono-data text-right ${r.latest_monthly_change >= 0 ? 'text-error' : 'text-success-green'}">
+            ${r.latest_monthly_change >= 0 ? '+' : ''}${r.latest_monthly_change_percent.toFixed(2)}%
           </td>
-          <td>
+          <td class="py-3 px-4 text-center">
             <span class="trend-pill trend-${r.trend.toLowerCase()}">${r.trend}</span>
           </td>
         </tr>
@@ -589,8 +608,8 @@ async function loadRoutesScreen() {
       Charts.renderTimeSeries(chartContainer, trendsData.series, {
         yKey: "freight_rate_usd_per_tonne",
         xKey: "date",
-        strokeColor: "#7C5CFC",
-        unit: "$/t",
+        strokeColor: "#7c5cfc",
+        height: 250,
       });
     }
   } catch (err) {
@@ -609,7 +628,9 @@ async function loadMarketScreen() {
     // Render Multi-series macro chart
     const macroChartEl = document.getElementById("mi-macro-chart");
     if (macroChartEl && marketTrends.series) {
-      Charts.renderMultiSeries(macroChartEl, marketTrends.series);
+      Charts.renderMultiSeries(macroChartEl, marketTrends.series, {
+        height: 300,
+      });
     }
 
     // Render Correlation Matrix
@@ -630,7 +651,6 @@ async function loadWeatherScreen() {
     const trends = await API.getWeatherTrends();
     const latest = await API.getLatestData();
 
-    // Group by port
     const ports = ["Australia West Coast", "Hay Point", "Taboneo"];
     const container = document.getElementById("wi-ports-grid");
     if (container) {
@@ -638,39 +658,42 @@ async function loadWeatherScreen() {
         const portTrends = trends.series.filter((s) => s.origin === port);
         const latestPt = portTrends[portTrends.length - 1] || {};
         const liveMatch = (latest.weather || []).find((w) => w.port === port);
+        const isHigh = latestPt.cyclone_risk >= 3.0;
 
         return `
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">
-                <span class="material-symbols-outlined icon">location_on</span>
-                ${port}
+          <div class="bg-surface-container-lowest border border-border-subtle rounded p-gutter ambient-shadow flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center mb-4 border-b border-border-subtle pb-2">
+                <div class="font-headline-sm text-base font-bold text-on-surface flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-primary text-lg">location_on</span>
+                  ${port}
+                </div>
+                <span class="risk-badge ${isHigh ? 'risk-high' : 'risk-low'}">
+                  Score: ${latestPt.cyclone_risk ? latestPt.cyclone_risk.toFixed(1) : '1.0'}/5
+                </span>
               </div>
-              <span class="risk-badge ${latestPt.cyclone_risk >= 3 ? 'risk-high' : 'risk-low'}">
-                Risk Score: ${latestPt.cyclone_risk ? latestPt.cyclone_risk.toFixed(1) : '1.0'}/5
-              </span>
+              <div class="grid grid-cols-2 gap-3 mb-4 text-xs">
+                <div class="p-2.5 bg-surface-container rounded border border-border-subtle">
+                  <span class="text-on-surface-variant block uppercase text-[10px]">Wind Speed</span>
+                  <span class="font-mono-data text-sm font-bold text-on-surface">${latestPt.wind_kmh ? latestPt.wind_kmh.toFixed(1) : '--'} km/h</span>
+                </div>
+                <div class="p-2.5 bg-surface-container rounded border border-border-subtle">
+                  <span class="text-on-surface-variant block uppercase text-[10px]">Wave Height</span>
+                  <span class="font-mono-data text-sm font-bold text-on-surface">${latestPt.wave_height_m ? latestPt.wave_height_m.toFixed(1) : '--'} m</span>
+                </div>
+                <div class="p-2.5 bg-surface-container rounded border border-border-subtle">
+                  <span class="text-on-surface-variant block uppercase text-[10px]">Cyclone Score</span>
+                  <span class="font-mono-data text-sm font-bold ${isHigh ? 'text-error' : 'text-success-green'}">${latestPt.cyclone_risk ? latestPt.cyclone_risk.toFixed(1) : '--'} / 5</span>
+                </div>
+                <div class="p-2.5 bg-surface-container rounded border border-border-subtle">
+                  <span class="text-on-surface-variant block uppercase text-[10px]">Weather Delay</span>
+                  <span class="font-mono-data text-sm font-bold text-on-surface">${latestPt.weather_delay_days ? latestPt.weather_delay_days.toFixed(1) : '0.0'} d</span>
+                </div>
+              </div>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-              <div class="kpi-card">
-                <span class="kpi-label">Wind Speed</span>
-                <span class="kpi-value">${latestPt.wind_kmh ? latestPt.wind_kmh.toFixed(1) : '--'}<span class="unit">km/h</span></span>
-              </div>
-              <div class="kpi-card">
-                <span class="kpi-label">Wave Height</span>
-                <span class="kpi-value">${latestPt.wave_height_m ? latestPt.wave_height_m.toFixed(1) : '--'}<span class="unit">m</span></span>
-              </div>
-              <div class="kpi-card">
-                <span class="kpi-label">Cyclone Score</span>
-                <span class="kpi-value">${latestPt.cyclone_risk ? latestPt.cyclone_risk.toFixed(1) : '--'}<span class="unit">0-5</span></span>
-              </div>
-              <div class="kpi-card">
-                <span class="kpi-label">Est. Delay</span>
-                <span class="kpi-value">${latestPt.weather_delay_days ? latestPt.weather_delay_days.toFixed(1) : '0.0'}<span class="unit">days</span></span>
-              </div>
-            </div>
-            <div style="font-size:0.75rem;color:var(--text-muted);display:flex;justify-content:space-between;">
-              <span>Historical Observation Date: ${latestPt.date || '2025-11-01'}</span>
-              <span>Live DB Status: ${liveMatch ? 'Active Cache' : 'Nominal Fallback'}</span>
+            <div class="text-[10px] text-on-surface-variant border-t border-border-subtle pt-2 flex justify-between">
+              <span>Observation: ${latestPt.date || '2025-11-01'}</span>
+              <span class="text-secondary font-mono-data">${liveMatch ? 'Active DB Cache' : 'Historical Anchor'}</span>
             </div>
           </div>
         `;
@@ -688,13 +711,11 @@ async function loadSourcesScreen() {
   try {
     const modelInfo = await API.getModelInfo();
     const telemetry = await API.getTelemetry(10);
-    const dataStatus = await API.getDataStatus();
 
-    // Model Details
     document.getElementById("ds-model-name").textContent = modelInfo.model || "freight_forecast_model_v3";
     document.getElementById("ds-model-algo").textContent = modelInfo.algorithm || "Bounded Residual Ridge Regression";
     document.getElementById("ds-model-alpha").textContent = modelInfo.alpha ? modelInfo.alpha.toFixed(1) : "10.0";
-    document.getElementById("ds-model-features").textContent = `${modelInfo.features || 13} Features`;
+    document.getElementById("ds-model-features").textContent = `${modelInfo.features || 13} Features (NO cargo_tonnes)`;
     document.getElementById("ds-dataset-name").textContent = "master_freight_training_expanded_v1.csv";
     document.getElementById("ds-dataset-obs").textContent = "110 Genuine Observations (2024-02-01 to 2025-11-01)";
 
@@ -702,13 +723,13 @@ async function loadSourcesScreen() {
     const tbody = document.getElementById("ds-telemetry-tbody");
     if (tbody && telemetry) {
       tbody.innerHTML = telemetry.map((t) => `
-        <tr>
-          <td style="font-family:var(--font-mono);font-size:0.75rem;">${(t.timestamp || '').substring(0, 19)}</td>
-          <td>${t.origin} → ${t.destination}</td>
-          <td>${t.commodity}</td>
-          <td class="tabular-nums" style="font-family:var(--font-mono);">$${t.current_freight_usd_per_tonne.toFixed(2)}</td>
-          <td class="tabular-nums" style="font-family:var(--font-mono);font-weight:600;">$${t.predicted_next_month_freight_usd_per_tonne.toFixed(2)}</td>
-          <td><span class="risk-badge ${t.risk_level === 'HIGH' ? 'risk-high' : 'risk-low'}">${t.risk_level}</span></td>
+        <tr class="hover:bg-surface-container-low transition-colors">
+          <td class="py-2.5 px-4 font-mono-data text-xs text-on-surface-variant">${(t.timestamp || '').substring(0, 19)}</td>
+          <td class="py-2.5 px-4 font-medium text-on-surface">${t.origin} → ${t.destination}</td>
+          <td class="py-2.5 px-4 text-on-surface-variant">${t.commodity}</td>
+          <td class="py-2.5 px-4 font-mono-data text-right text-on-surface">$${t.current_freight_usd_per_tonne.toFixed(2)}</td>
+          <td class="py-2.5 px-4 font-mono-data text-right font-bold text-primary">$${t.predicted_next_month_freight_usd_per_tonne.toFixed(2)}</td>
+          <td class="py-2.5 px-4"><span class="risk-badge ${t.risk_level === 'HIGH' ? 'risk-high' : 'risk-low'}">${t.risk_level}</span></td>
         </tr>
       `).join("");
     }
