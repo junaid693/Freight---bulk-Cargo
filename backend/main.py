@@ -37,16 +37,28 @@ from schemas import (
     FreightResponse,
     FreightTrendsResponse,
     LatestData,
+    DecisionAnalysisRequest,
+    DecisionAnalysisResponse,
     LatestMarketSnapshotResponse,
     MarketQuoteOut,
     MarketTrendsResponse,
+    ProcurementOverviewResponse,
+    ProcurementValuationResponse,
     RoutesResponse,
     ScenarioRequest,
     ScenarioResponse,
+    VesselOptimizationRequest,
+    VesselOptimizationResponse,
     WeatherSnapshot,
     WeatherTrendsResponse,
 )
-from services import analytics_service, dashboard_service
+from services import (
+    analytics_service,
+    dashboard_service,
+    decision_service,
+    procurement_service,
+    vessel_service,
+)
 from services.forecast_service import (
     ForecastDataError,
     forecast,
@@ -61,6 +73,12 @@ async def lifespan(app: FastAPI):
     # surface immediately and the first request is fast.
     get_model()
     init_data_layer()
+    try:
+        procurement_service.load_commodity_data()
+        vessel_service.load_vessel_specs()
+        vessel_service.load_port_constraints()
+    except Exception:
+        pass
     yield
 
 
@@ -354,6 +372,110 @@ def get_latest_market_snapshot():
 def get_telemetry(limit: int = 50):
     """Retrieve recent prediction audit logs (telemetry)."""
     return database.get_recent_prediction_logs(limit=limit)
+
+
+# --------------------------------------------------------------------------- #
+# Commodity Procurement Valuation & Decision Service
+# --------------------------------------------------------------------------- #
+@app.get(
+    "/procurement/valuation",
+    response_model=ProcurementValuationResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def get_procurement_valuation(
+    commodity: str = Query("Coal", description="Commodity to evaluate ('Coal' or 'Iron Ore')"),
+):
+    """Retrieve deterministic procurement valuation and BUY/MONITOR/WAIT signal for a commodity."""
+    try:
+        return procurement_service.calculate_procurement_valuation(commodity)
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "INVALID_COMMODITY",
+                "message": str(exc),
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+
+
+@app.get(
+    "/procurement/overview",
+    response_model=ProcurementOverviewResponse,
+)
+def get_procurement_overview():
+    """Retrieve procurement valuations and signals across all supported commodities."""
+    return procurement_service.get_procurement_overview()
+
+
+# --------------------------------------------------------------------------- #
+# Vessel Suitability & Chartering Optimization Service
+# --------------------------------------------------------------------------- #
+@app.post(
+    "/vessel/optimize",
+    response_model=VesselOptimizationResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def optimize_vessel(req: VesselOptimizationRequest):
+    """Evaluate vessel suitability and optimize chartering selection across available classes.
+    
+    Evaluates physical draft limits at discharge port, cargo volume fit against standard DWT,
+    corridor operational viability, and Model v3 freight rate economics.
+    """
+    try:
+        return vessel_service.optimize_vessel_chartering(
+            origin=req.origin,
+            destination=req.destination,
+            commodity=req.commodity,
+            cargo_tonnes=req.cargo_tonnes,
+            current_freight_usd_per_tonne=req.current_freight_usd_per_tonne,
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "INVALID_VESSEL_OPTIMIZATION_INPUT",
+                "message": str(exc),
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
+
+
+
+# --------------------------------------------------------------------------- #
+# Decision Orchestration Service (Unified Procurement + Vessel Chartering)
+# --------------------------------------------------------------------------- #
+@app.post(
+    "/decision/analyze",
+    response_model=DecisionAnalysisResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def analyze_decision(req: DecisionAnalysisRequest):
+    """Orchestrate commodity procurement valuation, vessel suitability, and Model v3 freight forecast.
+    
+    Synthesizes physical port constraints, cargo utilization, commodity pricing signals, and
+    forward freight dynamics into ONE operational procurement and chartering recommendation.
+    """
+    try:
+        return decision_service.analyze_decision(
+            origin=req.origin,
+            destination=req.destination,
+            commodity=req.commodity,
+            cargo_tonnes=req.cargo_tonnes,
+            current_freight_usd_per_tonne=req.current_freight_usd_per_tonne,
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "INVALID_DECISION_INPUT",
+                "message": str(exc),
+                "missing_fields": [],
+                "detail": str(exc),
+            },
+        )
 
 
 # --------------------------------------------------------------------------- #

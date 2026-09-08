@@ -51,6 +51,18 @@ async function request(endpoint, options = {}) {
 }
 
 export const API = {
+  // Decision Orchestration & Evaluation (MVP Core)
+  async analyzeDecision(payload) {
+    return request("/decision/analyze", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getProcurementOverview() {
+    return request("/procurement/overview");
+  },
+
   // Phase 4: Unified Dashboard Aggregation
   async getDashboardOverview() {
     return request("/dashboard/overview");

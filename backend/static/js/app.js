@@ -1,729 +1,646 @@
 /**
- * Freight Intelligence Platform — Application Controller
- * Phase 6: Optimized Chartering Decision Experience
- * Stitch UI Fidelity & Model v3 Decision Support Engine
+ * NaviFreight — Application Controller
+ * Simplified User-Facing Language (Professional Logistics Focus)
+ * Zero user-facing weather models, zero technical ML jargon.
  */
 
 import { API } from "./api.js";
 import { Charts } from "./charts.js";
 
-// Canonical Trade Corridors & Vessel Classes
-const CORRIDORS = {
-  "Hay Point": {
-    destination: "East Coast India",
-    commodities: ["Coal"],
-    vessels: [
-      { type: "Panamax", benchmarkRate: 20.00, capacity: "75,000 DWT typical", isDefault: true },
-      { type: "Capesize", benchmarkRate: 17.20, capacity: "170,000 DWT typical", isDefault: false },
-    ],
-    defaultVessel: "Panamax",
-    portWeather: { wind: 28.5, wave: 1.8, cyclone: 1.5, delay: 0.2, status: "Normal Sea State" },
+// Canonical trade corridors configuration for intuitive form defaults
+const CANONICAL_CORRIDORS = {
+  "Coal": {
+    defaultOrigin: "Hay Point",
+    defaultDest: "Dhamra",
+    defaultVolume: 150000,
+    validOrigins: ["Hay Point"],
   },
-  "Australia West Coast": {
-    destination: "East Coast India",
-    commodities: ["Iron Ore"],
-    vessels: [
-      { type: "Capesize", benchmarkRate: 12.90, capacity: "170,000 DWT typical", isDefault: true },
-    ],
-    defaultVessel: "Capesize",
-    portWeather: { wind: 27.2, wave: 1.9, cyclone: 1.0, delay: 0.1, status: "Calm Sea State" },
+  "Iron Ore": {
+    defaultOrigin: "Australia West Coast",
+    defaultDest: "Dhamra",
+    defaultVolume: 150000,
+    validOrigins: ["Australia West Coast"],
   },
-  "Taboneo": {
-    destination: "East Coast India",
-    commodities: ["Thermal Coal"],
-    vessels: [
-      { type: "Panamax", benchmarkRate: 11.80, capacity: "75,000 DWT typical", isDefault: true },
-      { type: "Supramax", benchmarkRate: 13.80, capacity: "55,000 DWT typical", isDefault: false },
-    ],
-    defaultVessel: "Panamax",
-    portWeather: { wind: 24.8, wave: 1.6, cyclone: 1.0, delay: 0.2, status: "Equatorial Calm" },
+  "Thermal Coal": {
+    defaultOrigin: "Taboneo",
+    defaultDest: "Dhamra",
+    defaultVolume: 75000,
+    validOrigins: ["Taboneo"],
   },
 };
 
-// Global App State
-const state = {
-  currentRoute: "outlook",
-  selectedOrigin: "Hay Point",
-  selectedDest: "East Coast India",
-  selectedCommodity: "Coal",
-  selectedVessel: "Panamax",
-  marketBaseline: {
-    bdi: 1970.0,
-    vlsfo_usd_per_tonne: 646.0,
-    coal_price_usd_per_mt: 112.6,
-    iron_ore_price_usd_per_dmt: 102.5,
-    latestDate: "2025-11-01",
-  },
-  vesselForecasts: {},
-  latestForecast: null,
-  scenarioResult: null,
+// Global State
+const appState = {
+  currentTab: "view-cargo-decision",
+  latestDecision: null,
+  activeOrigin: "Hay Point",
+  activeDestination: "Dhamra",
+  activeCommodity: "Coal",
+  activeCargoTonnes: 150000,
 };
 
-// Application Initialization
+// DOM Initialization
 document.addEventListener("DOMContentLoaded", async () => {
-  initRouter();
-  initDropdowns();
-  initScenarioControls();
-  initEventListeners();
-
-  // Fetch initial market data and load default route
-  await loadInitialMarketData();
-  handleNavigation(window.location.hash.replace("#", "") || "outlook");
+  initTabs();
+  initFormInteractions();
+  
+  // Initial analysis with standard default shipment
+  await runShipmentAnalysis();
 });
 
 // ---------------------------------------------------------------------------
-// 1. Router & View Management (3 Consolidated Screens)
+// 1. Tab Switching (Exactly Two Tabs)
 // ---------------------------------------------------------------------------
-function initRouter() {
-  window.addEventListener("hashchange", () => {
-    const route = window.location.hash.replace("#", "") || "outlook";
-    handleNavigation(route);
-  });
+function initTabs() {
+  const tabCargo = document.getElementById("tab-cargo");
+  const tabAudit = document.getElementById("tab-audit");
+  const viewCargo = document.getElementById("view-cargo-decision");
+  const viewAudit = document.getElementById("view-audit-evidence");
 
-  document.querySelectorAll(".nav-link").forEach((link) => {
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      const targetRoute = link.getAttribute("data-route");
-      window.location.hash = targetRoute;
-    });
-  });
-}
-
-function handleNavigation(route) {
-  // Normalize legacy routes to consolidated 3
-  if (route === "overview" || route === "forecast" || route === "routes" || route === "market" || route === "weather") {
-    route = "outlook";
-  }
-  if (route === "sources") {
-    route = "evidence";
-  }
-
-  state.currentRoute = route;
-
-  // Update Nav Link Active States
-  document.querySelectorAll(".nav-link").forEach((link) => {
-    if (link.getAttribute("data-route") === route) {
-      link.classList.add("active");
+  function switchTab(targetTab) {
+    if (targetTab === "cargo") {
+      tabCargo.classList.add("active");
+      tabAudit.classList.remove("active");
+      viewCargo.classList.remove("hidden");
+      viewAudit.classList.add("hidden");
+      appState.currentTab = "view-cargo-decision";
     } else {
-      link.classList.remove("active");
+      tabAudit.classList.add("active");
+      tabCargo.classList.remove("active");
+      viewAudit.classList.remove("hidden");
+      viewCargo.classList.add("hidden");
+      appState.currentTab = "view-audit-evidence";
     }
-  });
-
-  // Switch Screen Visibility
-  document.querySelectorAll(".screen-container").forEach((el) => {
-    el.classList.remove("active");
-  });
-
-  const activeScreen = document.getElementById(`screen-${route}`);
-  if (activeScreen) {
-    activeScreen.classList.add("active");
   }
 
-  // Update Topbar Title
-  const titleMap = {
-    outlook: "Freight Outlook & Decision Support",
-    scenario: "What-If Scenario Simulation",
-    evidence: "Data Provenance & Empirical Evidence",
-  };
-  const titleEl = document.getElementById("topbar-page-title");
-  if (titleEl) titleEl.textContent = titleMap[route] || "Freight Intelligence Platform";
-
-  // Trigger Screen Data Loading
-  if (route === "outlook") {
-    generateFreightOutlook(false); // fast load on initial view
-  } else if (route === "scenario") {
-    loadScenarioScreen();
-  } else if (route === "evidence") {
-    loadEvidenceScreen();
-  }
+  tabCargo.addEventListener("click", () => switchTab("cargo"));
+  tabAudit.addEventListener("click", () => switchTab("audit"));
 }
 
 // ---------------------------------------------------------------------------
-// 2. Automated Market Data Initialization
+// 2. Form Interactions & Canonical Corridors Synchronization
 // ---------------------------------------------------------------------------
-async function loadInitialMarketData() {
+function initFormInteractions() {
+  const selectCommodity = document.getElementById("input-commodity");
+  const selectOrigin = document.getElementById("input-origin");
+  const inputCargo = document.getElementById("input-cargo-tonnes");
+  const formShipment = document.getElementById("form-shipment");
+
+  // Synchronize Origin when Commodity changes
+  selectCommodity.addEventListener("change", (e) => {
+    const comm = e.target.value;
+    if (CANONICAL_CORRIDORS[comm]) {
+      selectOrigin.value = CANONICAL_CORRIDORS[comm].defaultOrigin;
+      inputCargo.value = CANONICAL_CORRIDORS[comm].defaultVolume;
+    }
+  });
+
+  // Synchronize Commodity when Origin changes
+  selectOrigin.addEventListener("change", (e) => {
+    const orig = e.target.value;
+    if (orig === "Australia West Coast") {
+      selectCommodity.value = "Iron Ore";
+      inputCargo.value = 150000;
+    } else if (orig === "Taboneo") {
+      selectCommodity.value = "Thermal Coal";
+      inputCargo.value = 75000;
+    } else if (orig === "Hay Point") {
+      selectCommodity.value = "Coal";
+      inputCargo.value = 150000;
+    }
+  });
+
+  // Form Submit Handler
+  formShipment.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await runShipmentAnalysis();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 3. Shipment Decision Execution & Rendering
+// ---------------------------------------------------------------------------
+async function runShipmentAnalysis() {
+  const btnAnalyze = document.getElementById("btn-analyze");
+  const spinner = document.getElementById("btn-analyze-spinner");
+  const btnText = document.getElementById("btn-analyze-text");
+  const errorContainer = document.getElementById("decision-error");
+  const errorMessage = document.getElementById("decision-error-message");
+
+  const commodity = document.getElementById("input-commodity").value;
+  const origin = document.getElementById("input-origin").value;
+  const destination = document.getElementById("input-destination").value;
+  const cargoTonnes = parseFloat(document.getElementById("input-cargo-tonnes").value) || 150000;
+
+  appState.activeCommodity = commodity;
+  appState.activeOrigin = origin;
+  appState.activeDestination = destination;
+  appState.activeCargoTonnes = cargoTonnes;
+
+  // UI Loading State
+  btnAnalyze.disabled = true;
+  spinner.classList.remove("hidden");
+  btnText.textContent = "Analyzing...";
+  errorContainer.classList.add("hidden");
+
   try {
-    const overview = await API.getDashboardOverview();
-    if (overview && overview.market) {
-      state.marketBaseline.bdi = Number(overview.market.bdi) || 1970.0;
-      state.marketBaseline.vlsfo_usd_per_tonne = Number(overview.market.vlsfo_usd_per_tonne) || 646.0;
-      state.marketBaseline.coal_price_usd_per_mt = Number(overview.market.coal_price_usd_per_mt) || 112.6;
-      state.marketBaseline.iron_ore_price_usd_per_dmt = Number(overview.market.iron_ore_price_usd_per_dmt) || 102.5;
-      state.marketBaseline.latestDate = overview.market.latest_date || "2025-11-01";
-    }
-
-    // Update Topbar Badge
-    const topbarText = document.getElementById("topbar-updated-text");
-    if (topbarText) {
-      topbarText.textContent = `Latest Market Data: ${state.marketBaseline.latestDate} Benchmark (Updated)`;
-    }
-
-    // Update Market Snapshots
-    const snapBdi = document.getElementById("snap-bdi-val");
-    if (snapBdi) snapBdi.textContent = Number(state.marketBaseline.bdi).toLocaleString();
-
-    const snapVlsfo = document.getElementById("snap-vlsfo-val");
-    if (snapVlsfo) snapVlsfo.textContent = `$${state.marketBaseline.vlsfo_usd_per_tonne.toFixed(2)}/t`;
-
-    const snapCoal = document.getElementById("snap-coal-val");
-    if (snapCoal) snapCoal.textContent = `$${state.marketBaseline.coal_price_usd_per_mt.toFixed(2)}/MT`;
-
-    const snapIron = document.getElementById("snap-iron-val");
-    if (snapIron) snapIron.textContent = `$${state.marketBaseline.iron_ore_price_usd_per_dmt.toFixed(2)}/dmt`;
-
-  } catch (err) {
-    console.warn("Notice: Initialized with verified 2025-11-01 benchmark values:", err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 3. Dropdown Cascading & Controls
-// ---------------------------------------------------------------------------
-function initDropdowns() {
-  const originSelect = document.getElementById("fc-origin-select");
-  const commoditySelect = document.getElementById("fc-commodity-select");
-
-  if (originSelect) {
-    originSelect.value = state.selectedOrigin;
-    originSelect.addEventListener("change", (e) => {
-      state.selectedOrigin = e.target.value;
-      updateCommodityOptions();
-      generateFreightOutlook(true);
-    });
-  }
-
-  if (commoditySelect) {
-    commoditySelect.addEventListener("change", (e) => {
-      state.selectedCommodity = e.target.value;
-      generateFreightOutlook(true);
-    });
-  }
-
-  updateCommodityOptions();
-}
-
-function updateCommodityOptions() {
-  const commoditySelect = document.getElementById("fc-commodity-select");
-  const corridor = CORRIDORS[state.selectedOrigin];
-  if (!corridor || !commoditySelect) return;
-
-  commoditySelect.innerHTML = corridor.commodities.map(
-    (c) => `<option value="${c}">${c}</option>`
-  ).join("");
-
-  state.selectedCommodity = corridor.commodities[0];
-  state.selectedVessel = corridor.defaultVessel;
-}
-
-function initEventListeners() {
-  const btnGenerate = document.getElementById("fc-btn-generate");
-  if (btnGenerate) {
-    btnGenerate.addEventListener("click", () => {
-      generateFreightOutlook(true);
-    });
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 4. Multi-Stage Loading Modal
-// ---------------------------------------------------------------------------
-async function playLoadingAnimation() {
-  const modal = document.getElementById("fc-loading-modal");
-  if (!modal) return;
-
-  const steps = [
-    { id: "step-market", text: "Fetching latest market conditions (BDI 1,970 • VLSFO $646/t)..." },
-    { id: "step-vessel", text: "Evaluating vessel economics & corridor dynamics..." },
-    { id: "step-weather", text: "Analyzing origin sea state & weather impact..." },
-    { id: "step-model", text: "Calculating next-month freight rate via Model v3..." },
-  ];
-
-  // Reset steps
-  steps.forEach((s) => {
-    const el = document.getElementById(s.id);
-    if (el) {
-      el.className = "loading-step-item";
-      el.querySelector("span.material-symbols-outlined").textContent = "radio_button_unchecked";
-    }
-  });
-
-  const subText = document.getElementById("loading-sub-text");
-  modal.classList.add("active");
-
-  for (let i = 0; i < steps.length; i++) {
-    const s = steps[i];
-    const el = document.getElementById(s.id);
-    if (subText) subText.textContent = s.text;
-
-    if (el) {
-      el.className = "loading-step-item active";
-      el.querySelector("span.material-symbols-outlined").textContent = "sync";
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 160));
-
-    if (el) {
-      el.className = "loading-step-item done";
-      el.querySelector("span.material-symbols-outlined").textContent = "check_circle";
-    }
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  modal.classList.remove("active");
-}
-
-// ---------------------------------------------------------------------------
-// 5. Freight Outlook & Vessel Optimization Engine
-// ---------------------------------------------------------------------------
-async function generateFreightOutlook(showAnimation = true) {
-  const corridor = CORRIDORS[state.selectedOrigin];
-  if (!corridor) return;
-
-  if (showAnimation) {
-    await playLoadingAnimation();
-  }
-
-  // Update Route Schematic Diagram
-  updateRouteSchematic(corridor);
-
-  // Update Weather Outlook
-  updateWeatherOutlook(corridor);
-
-  // Run Parallel Predictions for ALL supported vessels on this corridor
-  const vesselPromises = corridor.vessels.map(async (vessel) => {
     const payload = {
-      origin: state.selectedOrigin,
-      destination: corridor.destination,
-      commodity: state.selectedCommodity,
-      vessel_type: vessel.type,
-      current_freight_usd_per_tonne: vessel.benchmarkRate,
-      bdi: state.marketBaseline.bdi,
-      vlsfo_usd_per_tonne: state.marketBaseline.vlsfo_usd_per_tonne,
-      coal_price_usd_per_mt: state.marketBaseline.coal_price_usd_per_mt,
-      iron_ore_price_usd_per_dmt: state.marketBaseline.iron_ore_price_usd_per_dmt,
-      wind_kmh: corridor.portWeather.wind,
-      wave_height_m: corridor.portWeather.wave,
-      cyclone_risk: corridor.portWeather.cyclone,
-      weather_delay_days: corridor.portWeather.delay,
+      origin,
+      destination,
+      commodity,
+      cargo_tonnes: cargoTonnes,
     };
 
-    const res = await API.predict(payload);
-    return { vessel, res };
-  });
+    // Backend Decision Call
+    const decision = await API.analyzeDecision(payload);
+    appState.latestDecision = decision;
 
-  try {
-    const results = await Promise.all(vesselPromises);
-    state.vesselForecasts = {};
-    results.forEach(({ vessel, res }) => {
-      state.vesselForecasts[vessel.type] = { vessel, res };
-    });
-
-    // Primary benchmark forecast (Panamax for Hay Point / Taboneo, Capesize for Aus West Coast)
-    const primaryResult = state.vesselForecasts[corridor.defaultVessel] || results[0];
-    state.latestForecast = primaryResult.res;
-
-    // Render Hero Outlook Card
-    renderHeroOutlook(primaryResult.vessel, primaryResult.res);
-
-    // Render Optimized Chartering / Vessel Comparison Cards
-    renderVesselComparison(corridor, results);
-
-    // Render Historical Trend Chart
-    renderFreightTrendChart();
-
-    // Render Explainability Waterfall
-    if (primaryResult.res.explanation && primaryResult.res.explanation.drivers) {
-      const waterfallEl = document.getElementById("fc-expl-waterfall");
-      if (waterfallEl) {
-        Charts.renderDriverWaterfall(waterfallEl, primaryResult.res.explanation.drivers);
-      }
-    }
+    // Render All Sections in Exact Hierarchy
+    renderRecommendation(decision);
+    renderDecisionSummary(decision);
+    renderWhyReasons(decision);
+    renderLandedCost(decision);
+    renderVesselOptions(decision);
+    await renderFreightHistory(origin, commodity, decision.vessel ? decision.vessel.recommended_vessel : null);
+    syncAuditScreen(decision);
 
   } catch (err) {
-    console.error("Failed to generate freight outlook:", err);
+    console.error("Analysis error:", err);
+    errorContainer.classList.remove("hidden");
+    errorMessage.textContent = err.detail || err.message || "Failed to analyze shipment. Please check your connection.";
+  } finally {
+    btnAnalyze.disabled = false;
+    spinner.classList.add("hidden");
+    btnText.textContent = "Analyze Shipment";
   }
 }
 
-function renderHeroOutlook(vessel, res) {
-  const corridorTitle = document.getElementById("hero-corridor-title");
-  if (corridorTitle) corridorTitle.textContent = `${state.selectedOrigin} → ${state.selectedDest}`;
-
-  const vesselSub = document.getElementById("hero-commodity-vessel");
-  if (vesselSub) vesselSub.textContent = `${state.selectedCommodity} • ${vessel.type} Benchmark (${vessel.capacity})`;
-
-  const currentRateEl = document.getElementById("hero-current-rate");
-  if (currentRateEl) currentRateEl.textContent = `$${res.current_freight_usd_per_tonne.toFixed(2)}`;
-
-  const forecastRateEl = document.getElementById("hero-forecast-rate");
-  if (forecastRateEl) forecastRateEl.textContent = `$${res.predicted_next_month_freight_usd_per_tonne.toFixed(2)}`;
-
-  const chgPill = document.getElementById("hero-change-pill");
-  if (chgPill) {
-    const isDown = res.forecast_change_percent <= 0;
-    chgPill.className = `trend-pill ${isDown ? "trend-down" : "trend-up"} text-sm py-1 px-2.5 font-bold mt-1 inline-flex`;
-    chgPill.innerHTML = `
-      <span class="material-symbols-outlined text-[15px]">${isDown ? "arrow_downward" : "arrow_upward"}</span>
-      ${isDown ? "↓" : "↑"} ${Math.abs(res.forecast_change_percent).toFixed(2)}%
-    `;
-  }
-
-  const recoBadge = document.getElementById("hero-reco-badge");
-  if (recoBadge) {
-    recoBadge.className = `reco-badge ${res.recommendation === "CHARTER NOW" ? "reco-charter" : res.recommendation === "WAIT" ? "reco-wait" : "reco-monitor"} text-xs py-1.5 px-3.5`;
-    const icon = res.recommendation === "CHARTER NOW" ? "bolt" : res.recommendation === "WAIT" ? "schedule" : "visibility";
-    recoBadge.innerHTML = `
-      <span class="material-symbols-outlined text-[16px]">${icon}</span>
-      RECOMMENDATION: ${res.recommendation}
-    `;
-  }
-
-  const explanationText = document.getElementById("hero-explanation-text");
-  if (explanationText) {
-    explanationText.textContent = res.reason || `Model v3 projects freight to move by ${res.forecast_change_percent >= 0 ? '+' : ''}${res.forecast_change_percent.toFixed(2)}%.`;
-  }
+// ---------------------------------------------------------------------------
+// 4. Section Renderers (Simple Professional Language)
+// Standardized Logistics Decision Terminology Helpers
+function getCargoDecisionText(signal) {
+  if (signal === "BUY") return "BUY CARGO";
+  if (signal === "WAIT") return "WAIT TO BUY";
+  return "MONITOR CARGO";
 }
 
-function renderVesselComparison(corridor, results) {
-  const container = document.getElementById("vessel-cards-grid");
-  if (!container) return;
+function getFreightDecisionText(charterDecision) {
+  if (charterDecision === "CHARTER NOW") return "CHARTER NOW";
+  if (charterDecision === "WAIT TO CHARTER") return "WAIT TO CHARTER";
+  return "MONITOR FREIGHT";
+}
 
-  // Find recommended vessel: lowest predicted freight rate ($/t)
-  const sorted = [...results].sort((a, b) => 
-    a.res.predicted_next_month_freight_usd_per_tonne - b.res.predicted_next_month_freight_usd_per_tonne
-  );
-  const winner = sorted[0];
+// ---------------------------------------------------------------------------
+// 4. Section Renderers (Simple Professional Language)
+// ---------------------------------------------------------------------------
 
-  container.innerHTML = results.map(({ vessel, res }) => {
-    const isWinner = (vessel.type === winner.vessel.type) && results.length > 1;
-    const isDown = res.forecast_change_percent <= 0;
-    const diffFromWinner = res.predicted_next_month_freight_usd_per_tonne - winner.res.predicted_next_month_freight_usd_per_tonne;
+/**
+ * 2. Recommendation Hero Card (Two Separate Decisions: Cargo & Freight)
+ */
+function renderRecommendation(data) {
+  const twoDecisionsContainer = document.getElementById("recommendation-two-decisions");
+  const infeasibleContainer = document.getElementById("recommendation-infeasible");
+  const recCargoEl = document.getElementById("rec-cargo-decision");
+  const recFreightEl = document.getElementById("rec-freight-decision");
+  const explEl = document.getElementById("strategy-explanation");
+  const tsEl = document.getElementById("strategy-timestamp");
 
-    return `
-      <div class="vessel-card ${isWinner ? 'recommended' : 'benchmark'}">
-        ${isWinner ? `<div class="recommended-ribbon">RECOMMENDED (Lowest Rate)</div>` : ''}
-        
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <h4 class="text-base font-bold text-on-surface uppercase tracking-wide">${vessel.type}</h4>
-            <span class="text-[11px] text-on-surface-variant font-mono-data">${vessel.capacity}</span>
-          </div>
-          <span class="material-symbols-outlined text-[24px] ${isWinner ? 'text-success-green' : 'text-on-surface-variant'}">directions_boat</span>
-        </div>
+  const vRec = data.vessel || {};
+  const isNoVessel = vRec.status === "NO_SUITABLE_VESSEL" || (data.overall_strategy || "").includes("NO SUITABLE VESSEL");
 
-        <div class="my-3 space-y-2 border-t border-b border-border-light py-3">
-          <div class="flex justify-between items-baseline">
-            <span class="text-xs text-on-surface-variant">Forecast Rate:</span>
-            <span class="font-mono-data text-xl font-bold ${isWinner ? 'text-success-green' : 'text-primary'}">
-              $${res.predicted_next_month_freight_usd_per_tonne.toFixed(2)}<span class="text-xs font-normal text-on-surface-variant">/t</span>
-            </span>
-          </div>
+  if (isNoVessel) {
+    if (twoDecisionsContainer) twoDecisionsContainer.classList.add("hidden");
+    if (infeasibleContainer) infeasibleContainer.classList.remove("hidden");
+    explEl.textContent = "This shipment cannot be handled by a suitable vessel for the selected route. Try a smaller cargo volume or another destination port.";
+  } else {
+    if (twoDecisionsContainer) twoDecisionsContainer.classList.remove("hidden");
+    if (infeasibleContainer) infeasibleContainer.classList.add("hidden");
 
-          <div class="flex justify-between items-baseline">
-            <span class="text-xs text-on-surface-variant">Current Benchmark:</span>
-            <span class="font-mono-data text-sm font-semibold text-on-surface">
-              $${res.current_freight_usd_per_tonne.toFixed(2)}<span class="text-xs font-normal text-on-surface-variant">/t</span>
-            </span>
-          </div>
+    const cargoDecision = getCargoDecisionText(data.procurement?.signal);
+    const freightDecision = getFreightDecisionText(data.charter_decision);
 
-          <div class="flex justify-between items-center">
-            <span class="text-xs text-on-surface-variant">Projected Shift:</span>
-            <span class="trend-pill ${isDown ? 'trend-down' : 'trend-up'} text-xs py-0.5 px-2 font-bold">
-              ${isDown ? '↓' : '↑'} ${Math.abs(res.forecast_change_percent).toFixed(2)}%
-            </span>
-          </div>
-        </div>
+    // Update the two large decision text elements
+    if (recCargoEl) {
+      recCargoEl.textContent = cargoDecision;
+      recCargoEl.className = "text-2xl sm:text-3xl font-extrabold tracking-tight " + 
+        (cargoDecision === "BUY CARGO" ? "text-emerald-700" : cargoDecision === "WAIT TO BUY" ? "text-rose-700" : "text-amber-700");
+    }
 
-        <div class="flex items-center justify-between pt-1">
-          <span class="text-xs font-medium text-on-surface-variant">Action:</span>
-          <span class="reco-badge ${res.recommendation === 'CHARTER NOW' ? 'reco-charter' : res.recommendation === 'WAIT' ? 'reco-wait' : 'reco-monitor'} text-[11px]">
-            ${res.recommendation}
-          </span>
-        </div>
+    if (recFreightEl) {
+      recFreightEl.textContent = freightDecision;
+      recFreightEl.className = "text-2xl sm:text-3xl font-extrabold tracking-tight " +
+        (freightDecision === "CHARTER NOW" ? "text-brand-700" : freightDecision === "WAIT TO CHARTER" ? "text-amber-700" : "text-gray-700");
+    }
 
-        ${!isWinner && results.length > 1 ? `
-          <div class="mt-2.5 pt-2 border-t border-border-light text-[11px] text-on-surface-variant font-mono-data text-right">
-            +$${diffFromWinner.toFixed(2)}/t premium vs ${winner.vessel.type}
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }).join("");
+    // Natural single explanation sentence combining both decisions
+    if (cargoDecision === "WAIT TO BUY" && freightDecision === "CHARTER NOW") {
+      explEl.textContent = "Cargo prices are high, but freight rates are expected to rise. Wait to buy the cargo, but charter the vessel now.";
+    } else if (cargoDecision === "WAIT TO BUY" && freightDecision === "WAIT TO CHARTER") {
+      explEl.textContent = "Cargo prices are high and freight rates are expected to decrease. Wait to buy the cargo and wait before chartering.";
+    } else if (cargoDecision === "WAIT TO BUY" && freightDecision === "MONITOR FREIGHT") {
+      explEl.textContent = "Cargo prices are high while freight rates are steady. Wait to buy the cargo and monitor freight rates.";
+    } else if (cargoDecision === "BUY CARGO" && freightDecision === "CHARTER NOW") {
+      explEl.textContent = "Cargo prices are attractive and freight rates are expected to rise. Buy the cargo and charter the vessel now.";
+    } else if (cargoDecision === "BUY CARGO" && freightDecision === "WAIT TO CHARTER") {
+      explEl.textContent = "Cargo prices are attractive, but freight rates are expected to decrease. Buy the cargo now, but wait before chartering.";
+    } else if (cargoDecision === "BUY CARGO" && freightDecision === "MONITOR FREIGHT") {
+      explEl.textContent = "Cargo prices are attractive while freight rates are steady. Buy the cargo now and monitor freight rates.";
+    } else if (cargoDecision === "MONITOR CARGO" && freightDecision === "CHARTER NOW") {
+      explEl.textContent = "Cargo prices are steady, but freight rates are expected to rise. Monitor cargo prices, but charter the vessel now.";
+    } else if (cargoDecision === "MONITOR CARGO" && freightDecision === "WAIT TO CHARTER") {
+      explEl.textContent = "Cargo prices are steady and freight rates are expected to decrease. Monitor cargo prices and wait before chartering.";
+    } else {
+      explEl.textContent = "Cargo and freight markets are steady. Monitor cargo prices and freight rates for better entry windows.";
+    }
+  }
 
-  // Update Recommendation Rationale Callout
-  const winnerTitle = document.getElementById("vessel-winner-title");
-  const winnerRationale = document.getElementById("vessel-winner-rationale");
+  // Timestamp
+  const now = new Date();
+  tsEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
-  if (results.length > 1) {
-    const runnerUp = sorted[1];
-    const diff = runnerUp.res.predicted_next_month_freight_usd_per_tonne - winner.res.predicted_next_month_freight_usd_per_tonne;
-    const diffPct = (diff / runnerUp.res.predicted_next_month_freight_usd_per_tonne) * 100;
+/**
+ * 3. Decision Summary Cards (Cargo / Freight / Vessel)
+ */
+function renderDecisionSummary(data) {
+  const vRec = data.vessel || {};
+  const isNoVessel = vRec.status === "NO_SUITABLE_VESSEL" || (data.overall_strategy || "").includes("NO SUITABLE VESSEL");
 
-    if (winnerTitle) winnerTitle.textContent = `Recommended Vessel: ${winner.vessel.type}`;
-    if (winnerRationale) {
-      winnerRationale.textContent = `${winner.vessel.type} offers the lowest forecasted freight rate ($${winner.res.predicted_next_month_freight_usd_per_tonne.toFixed(2)}/t vs $${runnerUp.res.predicted_next_month_freight_usd_per_tonne.toFixed(2)}/t for ${runnerUp.vessel.type}), providing an estimated freight saving of $${diff.toFixed(2)}/tonne (${diffPct.toFixed(1)}% economic advantage) for bulk ${state.selectedCommodity.toLowerCase()} shipments on this corridor.`;
+  // 3.1 Cargo Card
+  const proc = data.procurement || {};
+  const cargoSignalBadge = document.getElementById("summary-cargo-signal-badge");
+  const cargoPrice = document.getElementById("summary-cargo-price");
+  const cargoUnit = document.getElementById("summary-cargo-unit");
+  const cargoPercentile = document.getElementById("summary-cargo-percentile");
+  const cargoMomentum = document.getElementById("summary-cargo-momentum");
+
+  const cargoDecision = getCargoDecisionText(proc.signal);
+  cargoSignalBadge.textContent = cargoDecision;
+  cargoSignalBadge.className = "badge";
+  if (cargoDecision === "BUY CARGO") cargoSignalBadge.classList.add("badge-success");
+  else if (cargoDecision === "WAIT TO BUY") cargoSignalBadge.classList.add("badge-danger");
+  else cargoSignalBadge.classList.add("badge-warning");
+
+  cargoPrice.textContent = proc.benchmark_price_usd_per_mt !== undefined ? `$${proc.benchmark_price_usd_per_mt.toFixed(2)}` : "—";
+  cargoUnit.textContent = proc.unit || "USD/mt";
+  
+  // Simple Price vs. History text
+  if (proc.percentile !== undefined) {
+    if (proc.percentile >= 75) {
+      cargoPercentile.textContent = `High (${Math.round(proc.percentile)}%)`;
+    } else if (proc.percentile <= 35) {
+      cargoPercentile.textContent = `Low (${Math.round(proc.percentile)}%)`;
+    } else {
+      cargoPercentile.textContent = `Moderate (${Math.round(proc.percentile)}%)`;
     }
   } else {
-    // Single vessel corridor (e.g. Iron Ore Capesize)
-    if (winnerTitle) winnerTitle.textContent = `Standard Corridor Carrier: ${winner.vessel.type}`;
-    if (winnerRationale) {
-      winnerRationale.textContent = `${winner.vessel.type} is the canonical vessel class serving the ${state.selectedOrigin} to ${corridor.destination} high-volume ${state.selectedCommodity.toLowerCase()} trade corridor ($${winner.res.predicted_next_month_freight_usd_per_tonne.toFixed(2)}/t forecast).`;
+    cargoPercentile.textContent = "—";
+  }
+  
+  if (proc.momentum_3m_pct !== undefined) {
+    const sign = proc.momentum_3m_pct > 0 ? "+" : "";
+    cargoMomentum.textContent = `${sign}${proc.momentum_3m_pct.toFixed(1)}%`;
+  } else {
+    cargoMomentum.textContent = "—";
+  }
+
+  // 3.2 Freight Card
+  const freightRate = document.getElementById("summary-freight-rate");
+  const freightUnit = document.getElementById("summary-freight-unit");
+  const charterBadge = document.getElementById("summary-freight-charter-badge");
+  const freightTiming = document.getElementById("summary-freight-timing");
+  const freightTimingContainer = document.getElementById("summary-freight-timing-container");
+
+  if (isNoVessel) {
+    freightRate.textContent = "Not available";
+    freightRate.className = "text-xl font-bold text-gray-400";
+    if (freightUnit) freightUnit.textContent = "";
+    charterBadge.textContent = "Not available";
+    charterBadge.className = "badge badge-neutral";
+    // Option A: Hide Charter Decision field when there is no suitable vessel
+    if (freightTimingContainer) {
+      freightTimingContainer.classList.add("hidden");
+    }
+  } else {
+    freightRate.textContent = vRec.predicted_freight_usd_per_tonne !== null && vRec.predicted_freight_usd_per_tonne !== undefined
+      ? `$${vRec.predicted_freight_usd_per_tonne.toFixed(2)}`
+      : "Not available";
+    freightRate.className = "text-2xl font-bold font-mono text-gray-900";
+    if (freightUnit) freightUnit.textContent = "USD/t";
+
+    const freightDecision = getFreightDecisionText(data.charter_decision);
+    charterBadge.textContent = freightDecision;
+    charterBadge.className = "badge";
+    if (freightDecision === "CHARTER NOW") charterBadge.classList.add("badge-primary");
+    else if (freightDecision === "WAIT TO CHARTER") charterBadge.classList.add("badge-warning");
+    else charterBadge.classList.add("badge-neutral");
+
+    if (freightTimingContainer) {
+      freightTimingContainer.classList.remove("hidden");
+    }
+    if (freightTiming) {
+      freightTiming.textContent = freightDecision;
     }
   }
-}
 
-function updateRouteSchematic(corridor) {
-  const originName = document.getElementById("schematic-origin-name");
-  if (originName) originName.textContent = state.selectedOrigin;
+  // 3.3 Vessel Card
+  const vesselBadge = document.getElementById("summary-vessel-status-badge");
+  const vesselName = document.getElementById("summary-vessel-name");
+  const vesselUtil = document.getElementById("summary-vessel-utilization");
+  const vesselOutlay = document.getElementById("summary-vessel-outlay");
+  const vesselScore = document.getElementById("summary-vessel-score");
 
-  const destName = document.getElementById("schematic-dest-name");
-  if (destName) destName.textContent = corridor.destination;
+  if (!isNoVessel && vRec.status === "OPTIMIZED" && vRec.recommended_vessel) {
+    vesselBadge.className = "badge badge-primary";
+    vesselBadge.textContent = vRec.recommended_vessel.toUpperCase();
+    vesselName.textContent = vRec.recommended_vessel;
 
-  const cargoPill = document.getElementById("route-cargo-pill");
-  if (cargoPill) cargoPill.textContent = `${state.selectedCommodity} • Dry Bulk`;
-
-  const vesselClasses = document.getElementById("schematic-vessel-classes");
-  if (vesselClasses) {
-    vesselClasses.textContent = corridor.vessels.map(v => v.type).join(" / ") + " Corridors";
-  }
-}
-
-function updateWeatherOutlook(corridor) {
-  const portContext = document.getElementById("weather-port-context");
-  if (portContext) portContext.textContent = `Origin Sea State • ${state.selectedOrigin}`;
-
-  const wx = corridor.portWeather;
-  const windEl = document.getElementById("wx-wind-val");
-  if (windEl) windEl.textContent = `${wx.wind.toFixed(1)} km/h`;
-
-  const waveEl = document.getElementById("wx-wave-val");
-  if (waveEl) waveEl.textContent = `${wx.wave.toFixed(1)} m`;
-
-  const cycloneEl = document.getElementById("wx-cyclone-val");
-  if (cycloneEl) cycloneEl.textContent = `${wx.cyclone.toFixed(1)} / 5`;
-
-  const delayEl = document.getElementById("wx-delay-val");
-  if (delayEl) delayEl.textContent = `${wx.delay.toFixed(1)} days`;
-
-  const statusBadge = document.getElementById("weather-status-badge");
-  if (statusBadge) statusBadge.textContent = wx.status;
-}
-
-async function renderFreightTrendChart() {
-  const container = document.getElementById("ov-trend-chart-container");
-  if (!container) return;
-
-  try {
-    const trends = await API.getFreightTrends({
-      origin: state.selectedOrigin,
-      commodity: state.selectedCommodity,
-    });
-
-    if (trends && trends.series) {
-      Charts.renderTimeSeries(container, trends.series, {
-        yKey: "freight_rate_usd_per_tonne",
-        xKey: "date",
-        strokeColor: "#1b1b1b",
-        height: 220,
-      });
-    }
-  } catch (err) {
-    console.warn("Trend chart load notice:", err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 6. What-If Scenario Simulation Controller
-// ---------------------------------------------------------------------------
-function initScenarioControls() {
-  const sliders = [
-    { id: "sc-slider-vlsfo", badge: "sc-badge-vlsfo", suffix: "%" },
-    { id: "sc-slider-bdi", badge: "sc-badge-bdi", suffix: "%" },
-    { id: "sc-slider-cyclone", badge: "sc-badge-cyclone", suffix: " pts" },
-    { id: "sc-slider-delay", badge: "sc-badge-delay", suffix: "%" },
-  ];
-
-  sliders.forEach((s) => {
-    const el = document.getElementById(s.id);
-    const badge = document.getElementById(s.badge);
-    if (el && badge) {
-      el.addEventListener("input", () => {
-        const val = Number(el.value);
-        badge.textContent = `${val >= 0 ? "+" : ""}${val}${s.suffix}`;
-        runScenarioSimulation();
-      });
-    }
-  });
-
-  // Preset Buttons
-  document.querySelectorAll(".sc-preset").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const sliderId = btn.getAttribute("data-slider");
-      const val = Number(btn.getAttribute("data-val"));
-      const slider = document.getElementById(sliderId);
-      if (slider) {
-        slider.value = val;
-        const matching = sliders.find(s => s.id === sliderId);
-        if (matching) {
-          const badge = document.getElementById(matching.badge);
-          if (badge) badge.textContent = `${val >= 0 ? "+" : ""}${val}${matching.suffix}`;
-        }
-        runScenarioSimulation();
-      }
-    });
-  });
-
-  // Reset Button
-  const btnReset = document.getElementById("sc-btn-reset");
-  if (btnReset) {
-    btnReset.addEventListener("click", () => {
-      sliders.forEach((s) => {
-        const el = document.getElementById(s.id);
-        const badge = document.getElementById(s.badge);
-        if (el) el.value = 0;
-        if (badge) badge.textContent = `0${s.suffix}`;
-      });
-      runScenarioSimulation();
-    });
-  }
-}
-
-async function loadScenarioScreen() {
-  const corridorDisplay = document.getElementById("sc-corridor-display");
-  if (corridorDisplay) {
-    corridorDisplay.textContent = `${state.selectedOrigin} → ${state.selectedDest} (${state.selectedCommodity} / ${state.selectedVessel})`;
-  }
-  await runScenarioSimulation();
-}
-
-async function runScenarioSimulation() {
-  const corridor = CORRIDORS[state.selectedOrigin];
-  if (!corridor) return;
-
-  const vlsfoShock = parseFloat(document.getElementById("sc-slider-vlsfo")?.value) || 0;
-  const bdiShock = parseFloat(document.getElementById("sc-slider-bdi")?.value) || 0;
-  const cycloneShock = parseFloat(document.getElementById("sc-slider-cyclone")?.value) || 0;
-  const delayShock = parseFloat(document.getElementById("sc-slider-delay")?.value) || 0;
-
-  const selectedVesselObj = corridor.vessels.find(v => v.type === state.selectedVessel) || corridor.vessels[0];
-
-  const payload = {
-    origin: state.selectedOrigin,
-    destination: corridor.destination,
-    commodity: state.selectedCommodity,
-    vessel_type: selectedVesselObj.type,
-    current_freight_usd_per_tonne: selectedVesselObj.benchmarkRate,
-    bdi: state.marketBaseline.bdi,
-    vlsfo_usd_per_tonne: state.marketBaseline.vlsfo_usd_per_tonne,
-    coal_price_usd_per_mt: state.marketBaseline.coal_price_usd_per_mt,
-    iron_ore_price_usd_per_dmt: state.marketBaseline.iron_ore_price_usd_per_dmt,
-    wind_kmh: corridor.portWeather.wind,
-    wave_height_m: corridor.portWeather.wave,
-    cyclone_risk: corridor.portWeather.cyclone,
-    weather_delay_days: corridor.portWeather.delay,
-    scenario_changes: {
-      vlsfo_change_percent: vlsfoShock !== 0 ? vlsfoShock : null,
-      bdi_change_percent: bdiShock !== 0 ? bdiShock : null,
-      cyclone_risk_change: cycloneShock !== 0 ? cycloneShock : null,
-      weather_delay_change_percent: delayShock !== 0 ? delayShock : null,
-    },
-  };
-
-  try {
-    const res = await API.predictScenario(payload);
-    state.scenarioResult = res;
-    renderScenarioResults(res, selectedVesselObj);
-  } catch (err) {
-    console.error("Scenario simulation failed:", err);
-  }
-}
-
-function renderScenarioResults(res, vessel) {
-  const baseVal = document.getElementById("sc-base-val");
-  if (baseVal) baseVal.textContent = `$${res.baseline.predicted_next_month_freight_usd_per_tonne.toFixed(2)}`;
-
-  const simVal = document.getElementById("sc-sim-val");
-  if (simVal) simVal.textContent = `$${res.scenario.predicted_next_month_freight_usd_per_tonne.toFixed(2)}`;
-
-  const baseReco = document.getElementById("sc-base-reco");
-  if (baseReco) {
-    baseReco.className = `reco-badge ${res.baseline.recommendation === "CHARTER NOW" ? "reco-charter" : res.baseline.recommendation === "WAIT" ? "reco-wait" : "reco-monitor"} text-[10px]`;
-    baseReco.textContent = res.baseline.recommendation;
-  }
-
-  const simReco = document.getElementById("sc-sim-reco");
-  if (simReco) {
-    simReco.className = `reco-badge ${res.scenario.recommendation === "CHARTER NOW" ? "reco-charter" : res.scenario.recommendation === "WAIT" ? "reco-wait" : "reco-monitor"} text-[10px]`;
-    simReco.textContent = res.scenario.recommendation;
-  }
-
-  const diff = res.impact.difference_usd_per_tonne;
-  const diffPct = res.impact.difference_percent;
-  const diffPill = document.getElementById("sc-diff-pill");
-  if (diffPill) {
-    diffPill.className = `trend-pill ${diff > 0 ? "trend-up" : diff < 0 ? "trend-down" : "trend-stable"} text-xs py-1 px-3 font-bold`;
-    diffPill.textContent = `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)}/t (${diffPct >= 0 ? "+" : ""}${diffPct.toFixed(2)}%)`;
-  }
-
-  const recoShift = document.getElementById("sc-reco-shift");
-  if (recoShift) recoShift.textContent = res.impact.recommendation_shift;
-
-  const riskShift = document.getElementById("sc-risk-shift");
-  if (riskShift) riskShift.textContent = res.impact.risk_level_shift;
-
-  const summary = document.getElementById("sc-summary");
-  if (summary) summary.textContent = res.summary;
-
-  // Vessel recommendation impact text
-  const vesselImpact = document.getElementById("sc-vessel-impact");
-  if (vesselImpact) {
-    if (state.selectedOrigin === "Hay Point") {
-      vesselImpact.textContent = `Baseline: Capesize offers lower freight rate ($15.91/t) → Scenario: Capesize retains economic efficiency over Panamax across tested market and weather conditions.`;
-    } else if (state.selectedOrigin === "Taboneo") {
-      vesselImpact.textContent = `Baseline: Panamax offers lower freight rate ($10.33/t) → Scenario: Panamax maintains economy of scale advantage over Supramax.`;
+    // Find utilization
+    const winningEval = (vRec.evaluated_vessels || []).find(v => v.vessel_type === vRec.recommended_vessel);
+    if (winningEval && winningEval.utilization_pct) {
+      vesselUtil.textContent = `(${Math.round(winningEval.utilization_pct)}% used)`;
     } else {
-      vesselImpact.textContent = `Capesize remains the sole canonical carrier for heavy iron ore movements on this corridor.`;
+      vesselUtil.textContent = "";
     }
+
+    vesselOutlay.textContent = vRec.estimated_freight_outlay_usd
+      ? `$${Math.round(vRec.estimated_freight_outlay_usd).toLocaleString()}`
+      : "Not available";
+    vesselScore.textContent = "Best fit";
+  } else {
+    vesselBadge.className = "badge badge-danger";
+    vesselBadge.textContent = "NOT SUITABLE";
+    vesselName.textContent = "NO SUITABLE VESSEL";
+    vesselUtil.textContent = "";
+    vesselOutlay.textContent = "Not available";
+    vesselScore.textContent = "Port / Cargo Limit";
   }
 }
 
-// ---------------------------------------------------------------------------
-// 7. Data & Evidence (Judge Verification & Telemetry)
-// ---------------------------------------------------------------------------
-async function loadEvidenceScreen() {
-  const tbody = document.getElementById("telemetry-tbody");
-  if (!tbody) return;
+/**
+ * 4. Why? (Simple, human-readable bullets. Zero weather/ML jargon.)
+ */
+function renderWhyReasons(data) {
+  const listEl = document.getElementById("decision-reasons-list");
+  listEl.innerHTML = "";
 
-  try {
-    const logs = await API.getTelemetry(15);
-    if (!logs || logs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" class="py-4 text-center text-on-surface-variant">No prediction telemetry logs recorded yet.</td></tr>`;
-      return;
+  const proc = data.procurement || {};
+  const vRec = data.vessel || {};
+  const isNoVessel = vRec.status === "NO_SUITABLE_VESSEL" || (data.overall_strategy || "").includes("NO SUITABLE VESSEL");
+  const charterDec = data.charter_decision || "";
+  const reasons = [];
+
+  // Reason 1: Cargo price comparison
+  if (proc.percentile !== undefined) {
+    if (proc.percentile >= 75) {
+      reasons.push("Cargo prices are currently high compared with history.");
+    } else if (proc.percentile <= 35) {
+      reasons.push("Cargo prices are currently attractive compared with history.");
+    } else {
+      reasons.push("Cargo prices are in a moderate historical range.");
+    }
+  }
+
+  if (isNoVessel) {
+    reasons.push("No suitable vessel is available for this route and cargo size.");
+    reasons.push("Try a smaller cargo volume or another destination port.");
+  } else {
+    // Reason 2: Price momentum
+    if (proc.momentum_3m_pct !== undefined) {
+      if (proc.momentum_3m_pct <= -2) {
+        reasons.push("Cargo prices have been trending downward over the past 3 months.");
+      } else if (proc.momentum_3m_pct >= 2) {
+        reasons.push("Cargo prices have been trending upward over the past 3 months.");
+      }
     }
 
-    tbody.innerHTML = logs.map((log) => {
-      const recoClass = log.recommendation === "CHARTER NOW" ? "reco-charter" : log.recommendation === "WAIT" ? "reco-wait" : "reco-monitor";
-      const chg = log.forecast_change_percent || 0;
-      const isPos = chg >= 0;
+    // Reason 3: Freight trajectory / timing
+    if (charterDec === "WAIT TO CHARTER") {
+      reasons.push("Freight is expected to decrease over the coming weeks.");
+      reasons.push("Waiting before chartering may reduce your ocean freight cost.");
+    } else if (charterDec === "CHARTER NOW") {
+      reasons.push("Freight rates are expected to rise. Chartering now may secure lower rates.");
+    } else {
+      reasons.push("Freight rates are currently steady.");
+    }
 
-      return `
-        <tr class="hover:bg-surface-container-low transition-colors">
-          <td class="py-2.5 px-3 text-on-surface-variant font-mono-data">${(log.timestamp || "").replace("T", " ").substring(0, 19)}</td>
-          <td class="py-2.5 px-3 font-medium text-on-surface">${log.origin} → ${log.destination}</td>
-          <td class="py-2.5 px-3 text-on-surface-variant">${log.vessel_type}</td>
-          <td class="py-2.5 px-3 text-right font-mono-data">$${Number(log.current_freight_usd_per_tonne).toFixed(2)}</td>
-          <td class="py-2.5 px-3 text-right font-mono-data font-semibold text-primary">$${Number(log.predicted_next_month_freight_usd_per_tonne).toFixed(2)}</td>
-          <td class="py-2.5 px-3 text-right font-mono-data ${isPos ? 'text-error' : 'text-success-green'}">
-            ${isPos ? '+' : ''}${chg.toFixed(2)}%
-          </td>
-          <td class="py-2.5 px-3 text-center">
-            <span class="reco-badge ${recoClass} text-[10px]">${log.recommendation || 'MONITOR'}</span>
-          </td>
-          <td class="py-2.5 px-3 text-right font-mono-data text-on-surface-variant">${log.latency_ms ? log.latency_ms.toFixed(1) + ' ms' : '--'}</td>
-        </tr>
-      `;
-    }).join("");
-  } catch (err) {
-    console.warn("Failed to fetch telemetry:", err);
-    tbody.innerHTML = `<tr><td colspan="8" class="py-4 text-center text-error">Failed to load telemetry logs.</td></tr>`;
+    // Reason 4: Vessel fit
+    if (vRec.recommended_vessel && vRec.status === "OPTIMIZED") {
+      reasons.push(`${vRec.recommended_vessel} is the best fit for this shipment.`);
+    }
   }
+
+  // Deduplicate and cap at 4 concise bullets
+  const uniqueReasons = [...new Set(reasons)].slice(0, 4);
+
+  uniqueReasons.forEach(reasonText => {
+    const li = document.createElement("li");
+    li.className = "flex items-start gap-2.5";
+    li.innerHTML = `
+      <span class="w-1.5 h-1.5 rounded-full bg-brand-600 mt-2 flex-shrink-0"></span>
+      <span class="text-gray-700 leading-snug">${escapeHtml(reasonText)}</span>
+    `;
+    listEl.appendChild(li);
+  });
+}
+
+/**
+ * 5. Estimated Landed Cost
+ */
+function renderLandedCost(data) {
+  const lc = data.landed_cost;
+  const vRec = data.vessel || {};
+  const isNoVessel = vRec.status === "NO_SUITABLE_VESSEL" || (data.overall_strategy || "").includes("NO SUITABLE VESSEL");
+
+  const fobEl = document.getElementById("lc-fob-rate");
+  const fobUnitEl = document.getElementById("lc-fob-unit");
+  const freightEl = document.getElementById("lc-freight-rate");
+  const freightUnitEl = document.getElementById("lc-freight-unit");
+  const landedEl = document.getElementById("lc-landed-rate");
+  const landedUnitEl = document.getElementById("lc-landed-unit");
+  const tonnesSummary = document.getElementById("lc-tonnes-summary");
+  const outlayEl = document.getElementById("lc-total-outlay");
+
+  if (isNoVessel || !lc || lc.estimated_landed_cost_usd === null || lc.estimated_landed_cost_usd === undefined) {
+    fobEl.textContent = data.procurement?.benchmark_price_usd_per_mt ? `$${data.procurement.benchmark_price_usd_per_mt.toFixed(2)}` : "—";
+    fobUnitEl.textContent = data.procurement?.unit || "USD/mt";
+    freightEl.textContent = "Not available";
+    freightEl.className = "text-xl font-bold text-gray-400";
+    if (freightUnitEl) freightUnitEl.textContent = "";
+    landedEl.textContent = "Not available";
+    landedEl.className = "text-xl font-bold text-gray-400";
+    if (landedUnitEl) landedUnitEl.textContent = "";
+    tonnesSummary.textContent = `${Math.round(data.cargo_tonnes).toLocaleString()} mt`;
+    outlayEl.textContent = "Not available";
+    return;
+  }
+
+  fobEl.textContent = `$${lc.commodity_fob_usd.toFixed(2)}`;
+  fobUnitEl.textContent = lc.commodity_unit || "USD/mt";
+
+  freightEl.textContent = `$${lc.ocean_freight_usd_per_tonne.toFixed(2)}`;
+  freightEl.className = "text-xl font-bold font-mono text-gray-900";
+  freightUnitEl.textContent = lc.freight_unit || "USD/t";
+
+  landedEl.textContent = `$${lc.estimated_landed_cost_usd.toFixed(2)}`;
+  landedEl.className = "text-2xl font-extrabold font-mono text-brand-700";
+  landedUnitEl.textContent = lc.landed_cost_unit || "USD/mt";
+
+  const cargoUnitDisplay = lc.commodity_unit.includes("dmt") ? "dmt" : "mt";
+  tonnesSummary.textContent = `${Math.round(data.cargo_tonnes).toLocaleString()} ${cargoUnitDisplay}`;
+
+  if (lc.estimated_total_landed_outlay_usd) {
+    outlayEl.textContent = `$${Math.round(lc.estimated_total_landed_outlay_usd).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} USD`;
+  } else {
+    outlayEl.textContent = "Not available";
+  }
+}
+
+/**
+ * 6. Vessel Options Table (Simple terminology)
+ */
+function renderVesselOptions(data) {
+  const tbody = document.getElementById("vessel-options-body");
+  const destPortEl = document.getElementById("vessel-table-port");
+  destPortEl.textContent = data.destination;
+  tbody.innerHTML = "";
+
+  const evaluated = data.vessel?.evaluated_vessels || [];
+  const winningClass = data.vessel?.recommended_vessel;
+
+  if (evaluated.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center py-6 text-gray-500 text-xs">
+          No vessel options available for this route.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  evaluated.forEach(item => {
+    const tr = document.createElement("tr");
+    const isRecommended = item.vessel_type === winningClass;
+    const isEligible = item.eligible === true;
+
+    if (isRecommended) {
+      tr.className = "row-recommended font-medium";
+    } else if (!isEligible) {
+      tr.className = "row-ineligible";
+    }
+
+    // Clean status badge
+    let statusCell = "";
+    if (isRecommended) {
+      statusCell = `<span class="badge badge-primary text-[11px]">Recommended</span>`;
+    } else if (isEligible) {
+      statusCell = `<span class="badge badge-neutral text-[11px]">Available</span>`;
+    } else {
+      statusCell = `<span class="badge badge-danger text-[10px]">Not suitable</span>`;
+    }
+
+    const rateDisplay = item.predicted_freight_usd_per_tonne
+      ? `$${item.predicted_freight_usd_per_tonne.toFixed(2)}/t`
+      : "—";
+
+    const utilDisplay = item.utilization_pct
+      ? `${Math.round(item.utilization_pct)}%`
+      : "—";
+
+    tr.innerHTML = `
+      <td>
+        <div class="font-bold text-gray-900">${escapeHtml(item.vessel_type)}</div>
+      </td>
+      <td class="font-mono text-xs text-gray-700">
+        ${Math.round(item.standard_dwt).toLocaleString()} DWT
+      </td>
+      <td class="font-mono text-xs font-semibold text-gray-900">
+        ${rateDisplay}
+      </td>
+      <td class="font-mono text-xs text-gray-700">
+        ${utilDisplay}
+      </td>
+      <td>
+        ${statusCell}
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+/**
+ * 7. Freight History (Compact SVG Chart)
+ */
+async function renderFreightHistory(origin, commodity, vesselType) {
+  const container = document.getElementById("chart-container");
+  const legendLabel = document.getElementById("chart-legend-label");
+  const vType = vesselType || "Capesize";
+
+  legendLabel.textContent = `${vType} ($/t) — ${origin} to Dhamra`;
+
+  try {
+    const params = {
+      origin,
+      commodity,
+      vessel_type: vType,
+    };
+
+    const trends = await API.getFreightTrends(params);
+    const series = trends.series || [];
+
+    if (series.length > 0) {
+      Charts.renderTimeSeries(container, series, {
+        xKey: "date",
+        yKey: "freight_rate_usd_per_tonne",
+        strokeColor: "#3B82F6",
+        unit: "$/t",
+        height: 200,
+      });
+    } else {
+      container.innerHTML = `<div class="p-8 text-center text-xs text-gray-400">Historical rates unavailable for this specific route.</div>`;
+    }
+  } catch (err) {
+    console.warn("Could not load freight trend chart:", err);
+    container.innerHTML = `<div class="p-8 text-center text-xs text-gray-400">Historical chart preview unavailable.</div>`;
+  }
+}
+
+/**
+ * Screen 2: Audit & Evidence Synchronization
+ */
+function syncAuditScreen(data) {
+  const tsEl = document.getElementById("audit-timestamp");
+  const routeEl = document.getElementById("audit-param-route");
+  const volEl = document.getElementById("audit-param-volume");
+  const stratEl = document.getElementById("audit-param-strategy");
+
+  const vRec = data.vessel || {};
+  const isNoVessel = vRec.status === "NO_SUITABLE_VESSEL" || (data.overall_strategy || "").includes("NO SUITABLE VESSEL");
+
+  tsEl.textContent = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
+  routeEl.textContent = `${data.commodity}: ${data.origin} → ${data.destination}`;
+  volEl.textContent = `${Math.round(data.cargo_tonnes).toLocaleString()} mt`;
+  if (isNoVessel) {
+    stratEl.textContent = "NO SUITABLE VESSEL";
+  } else {
+    const cargoDecision = getCargoDecisionText(data.procurement?.signal);
+    const freightDecision = getFreightDecisionText(data.charter_decision);
+    stratEl.textContent = `${cargoDecision} · ${freightDecision}`;
+  }
+}
+
+// Utility: HTML Escaping for Security
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

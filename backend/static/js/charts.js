@@ -25,7 +25,7 @@ export const Charts = {
 
     const yKey = options.yKey || "freight_rate_usd_per_tonne";
     const xKey = options.xKey || "date";
-    const strokeColor = options.strokeColor || "#7C5CFC";
+    const strokeColor = options.strokeColor || "#3B82F6";
     const unit = options.unit || "$/t";
 
     const yValues = dataPoints.map(d => Number(d[yKey]) || 0);
@@ -63,8 +63,8 @@ export const Charts = {
     for (let t = 0; t <= yTicksCount; t++) {
       const val = yMin + (t / yTicksCount) * (yMax - yMin);
       const y = getY(val);
-      gridLines += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="var(--border-subtle)" stroke-dasharray="3,3" />`;
-      yLabels += `<text x="${padding.left - 10}" y="${y + 4}" fill="var(--text-muted)" font-size="10" font-family="var(--font-mono)" text-anchor="end">${val.toFixed(1)}</text>`;
+      gridLines += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#E5E7EB" stroke-dasharray="3,3" />`;
+      yLabels += `<text x="${padding.left - 10}" y="${y + 4}" fill="#6B7280" font-size="10" font-family="monospace" text-anchor="end">${val.toFixed(1)}</text>`;
     }
 
     // X Axis labels (show ~5 points)
@@ -74,7 +74,7 @@ export const Charts = {
       if (i % step === 0 || i === dataPoints.length - 1) {
         const x = getX(i);
         const dateStr = (d[xKey] || "").substring(0, 7);
-        xLabels += `<text x="${x}" y="${height - 12}" fill="var(--text-muted)" font-size="10" font-family="var(--font-mono)" text-anchor="middle">${dateStr}</text>`;
+        xLabels += `<text x="${x}" y="${height - 12}" fill="#6B7280" font-size="10" font-family="monospace" text-anchor="middle">${dateStr}</text>`;
       }
     });
 
@@ -85,7 +85,7 @@ export const Charts = {
       const y = getY(d[yKey]);
       const val = Number(d[yKey]).toFixed(2);
       dots += `
-        <circle cx="${x}" cy="${y}" r="3" fill="${strokeColor}" stroke="var(--surface-card)" stroke-width="2">
+        <circle cx="${x}" cy="${y}" r="3.5" fill="${strokeColor}" stroke="#ffffff" stroke-width="2">
           <title>${d[xKey]}: ${val} ${unit}</title>
         </circle>
       `;
@@ -165,7 +165,7 @@ export const Charts = {
         ${xLabels}
 
         <!-- Freight Rate Line -->
-        <path d="${frPath}" fill="none" stroke="#7C5CFC" stroke-width="3" stroke-linecap="round" />
+        <path d="${frPath}" fill="none" stroke="#3B82F6" stroke-width="3" stroke-linecap="round" />
         <!-- BDI Line -->
         <path d="${bdiPath}" fill="none" stroke="#38BDF8" stroke-width="2" stroke-dasharray="4,3" />
         <!-- VLSFO Line -->

@@ -663,3 +663,198 @@ class LatestData(BaseModel):
     latest_freight_observation: Optional[dict] = Field(
         None, description="Most recent freight observation overall (if any)"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Procurement Valuation schemas
+# --------------------------------------------------------------------------- #
+class ProcurementValuationResponse(BaseModel):
+    """Structured valuation and procurement decision signal for a commodity."""
+
+    commodity: str = Field(..., description="Canonical commodity name (e.g. Coal, Iron Ore)")
+    benchmark_price_usd_per_mt: float = Field(..., description="Latest available benchmark price")
+    unit: str = Field(..., description="Quotation unit (e.g. USD/mt or USD/dmt)")
+    benchmark_date: str = Field(..., description="Date of the benchmark observation (YYYY-MM-DD)")
+    percentile: float = Field(..., description="Historical percentile of benchmark price (0-100)")
+    momentum_3m_pct: float = Field(..., description="Trailing 3-month price change percentage")
+    volatility_3m_pct: float = Field(..., description="Trailing 3-month standard deviation of monthly returns")
+    signal: str = Field(..., description="Procurement recommendation: BUY | MONITOR | WAIT")
+    signal_score: float = Field(..., description="Deterministic decision score (-100 to +100)")
+    reasons: list[str] = Field(..., description="Explanatory decision rationale bullets")
+    source: str = Field(default="World Bank Pink Sheet", description="Benchmark data source")
+    data_freshness: str = Field(..., description="Data observation period and publication status")
+
+
+class ProcurementOverviewResponse(BaseModel):
+    """Unified procurement valuation overview across all supported commodities."""
+
+    commodities: list[ProcurementValuationResponse] = Field(
+        ..., description="List of commodity procurement valuations"
+    )
+    total_supported: int = Field(..., description="Count of evaluated commodities")
+    source: str = Field(default="World Bank Pink Sheet")
+    evaluated_at: str = Field(..., description="UTC ISO timestamp of evaluation")
+
+
+# --------------------------------------------------------------------------- #
+# Vessel Suitability & Chartering Optimization schemas
+# --------------------------------------------------------------------------- #
+class VesselOptimizationRequest(BaseModel):
+    """Request payload for vessel suitability and chartering optimization."""
+
+    origin: str = Field(..., description="Origin port or region (e.g. 'Hay Point', 'Taboneo')")
+    destination: str = Field(..., description="Discharge port or region (e.g. 'Dhamra', 'Paradip', 'East Coast India')")
+    commodity: str = Field(..., description="Cargo commodity (e.g. 'Coal', 'Thermal Coal', 'Iron Ore')")
+    cargo_tonnes: float = Field(..., description="Intended shipment cargo volume in metric tonnes (strictly > 0)")
+    current_freight_usd_per_tonne: Optional[float] = Field(
+        None, description="Optional current freight benchmark rate (if omitted, latest canonical benchmark is used)"
+    )
+
+
+class VesselEvaluationItem(BaseModel):
+    """Evaluation result for an individual vessel class."""
+
+    vessel_type: str = Field(..., description="Vessel class (Capesize, Panamax, Supramax)")
+    standard_dwt: float = Field(..., description="Baltic Exchange standard deadweight tonnage")
+    draft_m: float = Field(..., description="Vessel fully laden draft in meters")
+    cargo_tonnes: float = Field(..., description="Evaluated cargo volume in metric tonnes")
+    utilization_pct: float = Field(..., description="Cargo capacity utilization percentage")
+    predicted_freight_usd_per_tonne: Optional[float] = Field(
+        None, description="Model v3 forecasted freight rate (USD/t)"
+    )
+    estimated_freight_outlay_usd: Optional[float] = Field(
+        None, description="Total estimated freight cost (rate * tonnes)"
+    )
+    forecast_change_percent: Optional[float] = Field(
+        None, description="Model v3 forecast percent change vs current freight"
+    )
+    forecast_recommendation: Optional[str] = Field(
+        None, description="Model v3 chartering recommendation ('CHARTER NOW', 'WAIT', 'MONITOR')"
+    )
+    forecast_risk_level: Optional[str] = Field(
+        None, description="Model v3 weather risk band ('LOW', 'MEDIUM', 'HIGH')"
+    )
+    port_compatible: bool = Field(..., description="Physical draft and berth feasibility at discharge port")
+    cargo_fit: bool = Field(..., description="Cargo volume compatibility with vessel deadweight")
+    corridor_supported: bool = Field(..., description="Whether vessel class operates on this trade lane")
+    eligible: bool = Field(..., description="Overall eligibility gate (port_compatible AND cargo_fit AND corridor_supported)")
+    suitability_score: float = Field(..., description="Suitability score on a 0-100 scale")
+    reasons: list[str] = Field(..., description="Detailed feasibility and scoring rationale bullets")
+
+
+class VesselOptimizationResponse(BaseModel):
+    """Optimization decision and comparative vessel evaluations."""
+
+    origin: str = Field(..., description="Loading port or region")
+    destination: str = Field(..., description="Discharge port or region")
+    commodity: str = Field(..., description="Cargo commodity")
+    cargo_tonnes: float = Field(..., description="Cargo volume in metric tonnes")
+    status: str = Field(..., description="'OPTIMIZED' or 'NO_SUITABLE_VESSEL'")
+    recommended_vessel: Optional[str] = Field(None, description="Recommended vessel class (or null if none eligible)")
+    recommendation_reason: str = Field(..., description="Comprehensive decision rationale")
+    evaluated_vessels: list[VesselEvaluationItem] = Field(..., description="Comparative evaluations across vessel classes")
+    source_data: dict[str, str] = Field(default_factory=dict, description="Attributed source datasets")
+
+
+# --------------------------------------------------------------------------- #
+# Decision Orchestration Schemas
+# --------------------------------------------------------------------------- #
+class DecisionProcurementSummary(BaseModel):
+    """Procurement valuation summary embedded in decision orchestration response."""
+
+    signal: str = Field(..., description="Procurement recommendation: BUY | MONITOR | WAIT")
+    benchmark_price_usd_per_mt: float = Field(..., description="Latest available commodity benchmark price")
+    unit: str = Field(..., description="Quotation unit (e.g. USD/mt or USD/dmt)")
+    benchmark_date: str = Field(..., description="Date of the benchmark observation (YYYY-MM-DD)")
+    percentile: float = Field(..., description="Historical percentile of benchmark price (0-100)")
+    momentum_3m_pct: float = Field(..., description="Trailing 3-month price change percentage")
+    data_freshness: str = Field(..., description="Data observation period and publication status")
+    reasons: list[str] = Field(default_factory=list, description="Procurement valuation rationale bullets")
+
+
+class DecisionVesselSummary(BaseModel):
+    """Vessel suitability & freight outlay summary embedded in decision orchestration response."""
+
+    recommended_vessel: Optional[str] = Field(None, description="Recommended vessel class (or null if none eligible)")
+    status: str = Field(..., description="'OPTIMIZED' or 'NO_SUITABLE_VESSEL'")
+    predicted_freight_usd_per_tonne: Optional[float] = Field(None, description="Model v3 forecasted freight rate (USD/t)")
+    estimated_freight_outlay_usd: Optional[float] = Field(None, description="Total estimated freight cost (rate * tonnes)")
+    suitability_score: Optional[float] = Field(None, description="Suitability score on a 0-100 scale")
+    reasons: list[str] = Field(default_factory=list, description="Vessel suitability and feasibility bullets")
+    evaluated_vessels: list[VesselEvaluationItem] = Field(
+        default_factory=list, description="Comparative evaluations across vessel classes"
+    )
+
+
+class DecisionLandedCostSummary(BaseModel):
+    """Delivered commodity acquisition cost economics combining commodity benchmark and ocean freight."""
+
+    commodity_fob_usd: Optional[float] = Field(
+        None, description="Procurement benchmark commodity price FOB"
+    )
+    ocean_freight_usd_per_tonne: Optional[float] = Field(
+        None, description="Forecasted ocean freight rate (USD/t)"
+    )
+    estimated_landed_cost_usd: Optional[float] = Field(
+        None, description="Estimated delivered commodity acquisition cost (FOB + Ocean Freight)"
+    )
+    commodity_unit: str = Field(..., description="Quotation unit for commodity (USD/mt or USD/dmt)")
+    freight_unit: str = Field(default="USD/t", description="Quotation unit for ocean freight (USD/t)")
+    landed_cost_unit: str = Field(..., description="Delivered quotation unit (USD/mt or USD/dmt)")
+    estimated_total_landed_outlay_usd: Optional[float] = Field(
+        None, description="Total estimated cargo acquisition + ocean freight outlay for parcel"
+    )
+    formula: str = Field(
+        default="Landed Cost = Commodity FOB + Ocean Freight",
+        description="Applied landed cost calculation formula",
+    )
+    provenance: dict[str, str] = Field(
+        default_factory=dict, description="Source provenance for commodity and freight components"
+    )
+    reasons: list[str] = Field(
+        default_factory=list, description="Landed cost calculation breakdown and explanation"
+    )
+
+
+class DecisionAnalysisRequest(BaseModel):
+    """Request payload for end-to-end procurement and chartering decision orchestration."""
+
+    commodity: str = Field(..., description="Cargo commodity (e.g. 'Coal', 'Iron Ore')")
+    origin: str = Field(..., description="Origin port or region (e.g. 'Hay Point', 'Taboneo')")
+    destination: str = Field(..., description="Discharge port or region (e.g. 'Dhamra', 'Paradip', 'East Coast India')")
+    cargo_tonnes: float = Field(..., description="Intended shipment cargo volume in metric tonnes (strictly > 0)")
+    current_freight_usd_per_tonne: Optional[float] = Field(
+        None, description="Optional current freight benchmark rate (USD/tonne) to override baseline"
+    )
+
+
+class DecisionAnalysisResponse(BaseModel):
+    """Unified operational procurement and chartering strategy decision response."""
+
+    commodity: str = Field(..., description="Canonical commodity name")
+    origin: str = Field(..., description="Loading port or trade corridor")
+    destination: str = Field(..., description="Discharge port or region")
+    cargo_tonnes: float = Field(..., description="Cargo volume in metric tonnes")
+    procurement: DecisionProcurementSummary = Field(..., description="Commodity valuation and market signal")
+    vessel: DecisionVesselSummary = Field(..., description="Vessel suitability and freight forecast economics")
+    landed_cost: DecisionLandedCostSummary = Field(
+        ..., description="Delivered commodity acquisition cost economics (FOB + Freight)"
+    )
+    charter_decision: str = Field(
+        ..., description="Freight timing recommendation: CHARTER NOW | WAIT TO CHARTER | MONITOR FREIGHT | NO SUITABLE VESSEL"
+    )
+    overall_strategy: str = Field(
+        ..., description="Combined operational directive (e.g. 'BUY CARGO — CHARTER NOW')"
+    )
+    weather_override: bool = Field(
+        ..., description="Whether elevated weather risk changed the charter timing decision to CHARTER NOW"
+    )
+    weather_risk_level: str = Field(
+        ..., description="Maritime weather risk band: LOW | MEDIUM | HIGH"
+    )
+    decision_reasons: list[str] = Field(
+        ..., description="Structured transparent explanations synthesizing all layers"
+    )
+
+
+
