@@ -172,33 +172,26 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false, showAnalysis
           apiFinished = true;
         });
 
-      // Sequence through sentences (600-800ms per step, targeting ~700ms)
+      // Sequence through all 5 statements (~600ms each, total ~3s)
       for (let i = 0; i < ANALYSIS_SENTENCES.length; i++) {
         updateLoadingSentence(ANALYSIS_SENTENCES[i]);
 
-        // If at the 5th and final sentence ("Calculating landed cost"),
-        // keep it active with animated dots until backend response arrives
-        if (i === ANALYSIS_SENTENCES.length - 1) {
-          while (!apiFinished) {
-            await new Promise((r) => setTimeout(r, 50));
-          }
-          break;
-        }
-
-        // Display current sentence for ~700ms (checked every 50ms for immediate error exit)
+        // Display each sentence for ~600ms (check every 50ms for error exit)
         let elapsed = 0;
-        while (elapsed < 700) {
+        while (elapsed < 600) {
           if (apiError) break;
           await new Promise((r) => setTimeout(r, 50));
           elapsed += 50;
         }
 
         if (apiError) break;
+      }
 
-        // If backend responds before sequence finishes,
-        // immediately move to results after current short step
-        if (apiFinished) {
-          break;
+      // If backend is still running after all 5 statements have shown,
+      // stay on "Calculating landed cost ..." with the animated dots until it arrives
+      if (!apiError && !apiFinished) {
+        while (!apiFinished) {
+          await new Promise((r) => setTimeout(r, 50));
         }
       }
 
