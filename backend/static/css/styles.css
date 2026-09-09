@@ -331,3 +331,179 @@ body {
   visibility: visible;
 }
 
+/* ==========================================================================
+   Shipment Analysis Overlay (Dark Ocean-Blue / Charcoal Theme)
+   ========================================================================== */
+.analysis-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.analysis-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.analysis-card {
+  position: relative;
+  width: 100%;
+  max-width: 24rem;
+  background: #0F172A; /* Dark charcoal / deep ocean slate */
+  border: 1px solid rgba(56, 189, 248, 0.25); /* Subtle sea-blue border */
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 1.5rem;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 35px rgba(56, 189, 248, 0.15); /* Sea-blue glow */
+  text-align: center;
+  color: #F8FAFC;
+}
+
+/* Subtle Sea-Blue Animated Loading Indicator */
+.analysis-radar-container {
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.analysis-radar-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.15);
+  animation: radar-pulse 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.analysis-radar-core {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: #1E293B;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #38BDF8; /* Sea-blue accent */
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+}
+
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+/* Typography */
+.analysis-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.25rem;
+}
+
+.analysis-subtitle {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  margin-bottom: 1.25rem;
+}
+
+/* Progressive Processing Steps List */
+.analysis-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 1rem;
+}
+
+.analysis-step {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.analysis-step.pending {
+  color: #64748B;
+  opacity: 0.6;
+}
+
+.analysis-step.active {
+  color: #F1F5F9;
+  font-weight: 500;
+  opacity: 1;
+}
+
+.analysis-step.done {
+  color: #94A3B8;
+  opacity: 0.9;
+}
+
+.step-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: center;
+}
+
+.analysis-step.pending .step-indicator {
+  color: #475569;
+  font-size: 1rem;
+}
+
+.analysis-step.active .step-indicator {
+  color: #38BDF8;
+  font-size: 1.25rem;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+  animation: step-pulse 1s infinite alternate;
+}
+
+.analysis-step.done .step-indicator {
+  color: #38BDF8;
+  font-size: 0.875rem;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+}
+
+@keyframes step-pulse {
+  from {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+

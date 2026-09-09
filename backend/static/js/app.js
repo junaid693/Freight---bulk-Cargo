@@ -45,8 +45,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   initFormInteractions();
   initBackToTop();
   
-  // Initial analysis with standard default shipment (no auto-scroll on initial load)
-  await runShipmentAnalysis({ scrollOnSuccess: false });
+  // Initial analysis with standard default shipment (no overlay/auto-scroll on initial load)
+  await runShipmentAnalysis({ scrollOnSuccess: false, showAnalysisOverlay: false });
 });
 
 // ---------------------------------------------------------------------------
@@ -114,14 +114,14 @@ function initFormInteractions() {
   // Form Submit Handler (Scrolls to results on successful user submission)
   formShipment.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await runShipmentAnalysis({ scrollOnSuccess: true });
+    await runShipmentAnalysis({ scrollOnSuccess: true, showAnalysisOverlay: true });
   });
 }
 
 // ---------------------------------------------------------------------------
 // 3. Shipment Decision Execution & Rendering
 // ---------------------------------------------------------------------------
-async function runShipmentAnalysis(opts = { scrollOnSuccess: false }) {
+async function runShipmentAnalysis(opts = { scrollOnSuccess: false, showAnalysisOverlay: false }) {
   const btnAnalyze = document.getElementById("btn-analyze");
   const spinner = document.getElementById("btn-analyze-spinner");
   const btnText = document.getElementById("btn-analyze-text");
@@ -138,7 +138,8 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false }) {
   appState.activeDestination = destination;
   appState.activeCargoTonnes = cargoTonnes;
 
-  // UI Loading State
+  // 1. START ANALYSIS STATE
+  // Immediately disable the Analyze Shipment button to prevent duplicate requests
   btnAnalyze.disabled = true;
   spinner.classList.remove("hidden");
   btnText.textContent = "Analyzing...";
@@ -152,11 +153,29 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false }) {
       cargo_tonnes: cargoTonnes,
     };
 
-    // Backend Decision Call
-    const decision = await API.analyzeDecision(payload);
+    let decision;
+    if (opts && opts.showAnalysisOverlay) {
+      startAnalysisProgress();
+
+      // Minimum display duration (~2.2s) ensures user sees progressive factors
+      // If backend takes longer than 2.2s, it naturally awaits the real response
+      const minDelayPromise = new Promise((resolve) => setTimeout(resolve, 2200));
+      const [apiResult] = await Promise.all([
+        API.analyzeDecision(payload),
+        minDelayPromise,
+      ]);
+      decision = apiResult;
+
+      // Complete and remove loading overlay
+      stopAnalysisProgress();
+    } else {
+      decision = await API.analyzeDecision(payload);
+    }
+
     appState.latestDecision = decision;
 
-    // Render All Sections in Exact Hierarchy
+    // 3. AFTER ANALYSIS COMPLETES
+    // Display the actual recommendation and results
     renderRecommendation(decision);
     renderDecisionSummary(decision);
     renderWhyReasons(decision);
@@ -165,16 +184,22 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false }) {
     await renderFreightHistory(origin, commodity, decision.vessel ? decision.vessel.recommended_vessel : null);
     syncAuditScreen(decision);
 
-    // Smooth-scroll to results section upon successful user-initiated analysis
+    // Smoothly scroll the page so the Recommendation heading is visible near top of viewport
     if (opts && opts.scrollOnSuccess) {
-      scrollToResults();
+      setTimeout(() => {
+        scrollToResults();
+      }, 50);
     }
 
   } catch (err) {
     console.error("Analysis error:", err);
+    // 4. ERROR HANDLING
+    stopAnalysisProgress();
     errorContainer.classList.remove("hidden");
-    errorMessage.textContent = err.detail || err.message || "Failed to analyze shipment. Please check your connection.";
+    errorMessage.textContent = "Unable to analyze this shipment. Please try again.";
+    // Do not scroll to the results section
   } finally {
+    // Re-enable Analyze Shipment button
     btnAnalyze.disabled = false;
     spinner.classList.add("hidden");
     btnText.textContent = "Analyze Shipment";
@@ -672,9 +697,85 @@ function initBackToTop() {
 }
 
 function scrollToResults() {
-  const resultsEl = document.getElementById("results-landed-vessel");
+  const resultsEl = document.getElementById("section-recommendation") || document.getElementById("results-landed-vessel");
   if (resultsEl) {
     resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 6. Analysis Progress Controller (Dark Charcoal / Sea-Blue Step Overlay)
+// ---------------------------------------------------------------------------
+let analysisTimers = [];
+
+function startAnalysisProgress() {
+  const overlay = document.getElementById("analysis-overlay");
+  if (!overlay) return;
+
+  stopAnalysisProgress();
+
+  // Reset steps to initial state: Step 1 active, Steps 2-5 pending
+  for (let i = 1; i <= 5; i++) {
+    const stepEl = document.getElementById(`analysis-step-${i}`);
+    const iconEl = document.getElementById(`step-icon-${i}`);
+    if (stepEl && iconEl) {
+      if (i === 1) {
+        stepEl.className = "analysis-step active";
+        iconEl.textContent = "•";
+      } else {
+        stepEl.className = "analysis-step pending";
+        iconEl.textContent = "·";
+      }
+    }
+  }
+
+  overlay.classList.remove("hidden");
+
+  // Step schedule: 450ms, 900ms, 1350ms, 1800ms
+  const advanceStep = (doneIdx, activeIdx, delay) => {
+    const timer = setTimeout(() => {
+      const prevStep = document.getElementById(`analysis-step-${doneIdx}`);
+      const prevIcon = document.getElementById(`step-icon-${doneIdx}`);
+      if (prevStep && prevIcon) {
+        prevStep.className = "analysis-step done";
+        prevIcon.textContent = "✓";
+      }
+
+      if (activeIdx <= 5) {
+        const nextStep = document.getElementById(`analysis-step-${activeIdx}`);
+        const nextIcon = document.getElementById(`step-icon-${activeIdx}`);
+        if (nextStep && nextIcon) {
+          nextStep.className = "analysis-step active";
+          nextIcon.textContent = "•";
+        }
+      }
+    }, delay);
+    analysisTimers.push(timer);
+  };
+
+  advanceStep(1, 2, 450);
+  advanceStep(2, 3, 900);
+  advanceStep(3, 4, 1350);
+  advanceStep(4, 5, 1800);
+
+  // Final checkmark on step 5
+  const finalTimer = setTimeout(() => {
+    const step5 = document.getElementById("analysis-step-5");
+    const icon5 = document.getElementById("step-icon-5");
+    if (step5 && icon5) {
+      step5.className = "analysis-step done";
+      icon5.textContent = "✓";
+    }
+  }, 2150);
+  analysisTimers.push(finalTimer);
+}
+
+function stopAnalysisProgress() {
+  analysisTimers.forEach((t) => clearTimeout(t));
+  analysisTimers = [];
+  const overlay = document.getElementById("analysis-overlay");
+  if (overlay) {
+    overlay.classList.add("hidden");
   }
 }
 
