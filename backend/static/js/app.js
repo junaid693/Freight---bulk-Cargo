@@ -43,9 +43,10 @@ const appState = {
 document.addEventListener("DOMContentLoaded", async () => {
   initTabs();
   initFormInteractions();
+  initBackToTop();
   
-  // Initial analysis with standard default shipment
-  await runShipmentAnalysis();
+  // Initial analysis with standard default shipment (no auto-scroll on initial load)
+  await runShipmentAnalysis({ scrollOnSuccess: false });
 });
 
 // ---------------------------------------------------------------------------
@@ -110,17 +111,17 @@ function initFormInteractions() {
     }
   });
 
-  // Form Submit Handler
+  // Form Submit Handler (Scrolls to results on successful user submission)
   formShipment.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await runShipmentAnalysis();
+    await runShipmentAnalysis({ scrollOnSuccess: true });
   });
 }
 
 // ---------------------------------------------------------------------------
 // 3. Shipment Decision Execution & Rendering
 // ---------------------------------------------------------------------------
-async function runShipmentAnalysis() {
+async function runShipmentAnalysis(opts = { scrollOnSuccess: false }) {
   const btnAnalyze = document.getElementById("btn-analyze");
   const spinner = document.getElementById("btn-analyze-spinner");
   const btnText = document.getElementById("btn-analyze-text");
@@ -163,6 +164,11 @@ async function runShipmentAnalysis() {
     renderVesselOptions(decision);
     await renderFreightHistory(origin, commodity, decision.vessel ? decision.vessel.recommended_vessel : null);
     syncAuditScreen(decision);
+
+    // Smooth-scroll to results section upon successful user-initiated analysis
+    if (opts && opts.scrollOnSuccess) {
+      scrollToResults();
+    }
 
   } catch (err) {
     console.error("Analysis error:", err);
@@ -644,3 +650,31 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// ---------------------------------------------------------------------------
+// 5. Navigation Helpers (Back to Top & Results Scroll)
+// ---------------------------------------------------------------------------
+function initBackToTop() {
+  const btnBackToTop = document.getElementById("btn-back-to-top");
+  if (!btnBackToTop) return;
+
+  window.addEventListener("scroll", () => {
+    if (window.scrollY > 250) {
+      btnBackToTop.classList.add("visible");
+    } else {
+      btnBackToTop.classList.remove("visible");
+    }
+  }, { passive: true });
+
+  btnBackToTop.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
+function scrollToResults() {
+  const resultsEl = document.getElementById("results-landed-vessel");
+  if (resultsEl) {
+    resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
