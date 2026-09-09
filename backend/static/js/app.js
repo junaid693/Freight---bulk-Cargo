@@ -155,26 +155,65 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false, showAnalysis
 
     let decision;
     if (opts && opts.showAnalysisOverlay) {
-      startAnalysisProgress();
+      showLoadingCard();
 
-      // Minimum display duration (~2.2s) ensures user sees progressive factors
-      // If backend takes longer than 2.2s, it naturally awaits the real response
-      const minDelayPromise = new Promise((resolve) => setTimeout(resolve, 2200));
-      const [apiResult] = await Promise.all([
-        API.analyzeDecision(payload),
-        minDelayPromise,
-      ]);
+      let apiFinished = false;
+      let apiError = null;
+      let apiResult = null;
+
+      // Start the real backend call immediately (no duplicate requests)
+      API.analyzeDecision(payload)
+        .then((res) => {
+          apiResult = res;
+          apiFinished = true;
+        })
+        .catch((err) => {
+          apiError = err;
+          apiFinished = true;
+        });
+
+      // Sequence through sentences (600-800ms per step, targeting ~700ms)
+      for (let i = 0; i < ANALYSIS_SENTENCES.length; i++) {
+        updateLoadingSentence(ANALYSIS_SENTENCES[i]);
+
+        // If at the 5th and final sentence ("Calculating landed cost"),
+        // keep it active with animated dots until backend response arrives
+        if (i === ANALYSIS_SENTENCES.length - 1) {
+          while (!apiFinished) {
+            await new Promise((r) => setTimeout(r, 50));
+          }
+          break;
+        }
+
+        // Display current sentence for ~700ms (checked every 50ms for immediate error exit)
+        let elapsed = 0;
+        while (elapsed < 700) {
+          if (apiError) break;
+          await new Promise((r) => setTimeout(r, 50));
+          elapsed += 50;
+        }
+
+        if (apiError) break;
+
+        // If backend responds before sequence finishes,
+        // immediately move to results after current short step
+        if (apiFinished) {
+          break;
+        }
+      }
+
+      hideLoadingCard();
+
+      if (apiError) {
+        throw apiError;
+      }
       decision = apiResult;
-
-      // Complete and remove loading overlay
-      stopAnalysisProgress();
     } else {
       decision = await API.analyzeDecision(payload);
     }
 
     appState.latestDecision = decision;
 
-    // 3. AFTER ANALYSIS COMPLETES
     // Display the actual recommendation and results
     renderRecommendation(decision);
     renderDecisionSummary(decision);
@@ -193,11 +232,10 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false, showAnalysis
 
   } catch (err) {
     console.error("Analysis error:", err);
-    // 4. ERROR HANDLING
-    stopAnalysisProgress();
+    // Error Handling: remove loading card, show simple error message, do not scroll
+    hideLoadingCard();
     errorContainer.classList.remove("hidden");
     errorMessage.textContent = "Unable to analyze this shipment. Please try again.";
-    // Do not scroll to the results section
   } finally {
     // Re-enable Analyze Shipment button
     btnAnalyze.disabled = false;
@@ -704,78 +742,38 @@ function scrollToResults() {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Analysis Progress Controller (Dark Charcoal / Sea-Blue Step Overlay)
+// 6. Analysis Loading Card Controller (Simple White Enterprise Panel)
 // ---------------------------------------------------------------------------
-let analysisTimers = [];
+const ANALYSIS_SENTENCES = [
+  "Analyzing freight rates",
+  "Reviewing cargo prices",
+  "Checking weather conditions",
+  "Selecting suitable vessel",
+  "Calculating landed cost"
+];
 
-function startAnalysisProgress() {
+function showLoadingCard() {
   const overlay = document.getElementById("analysis-overlay");
-  if (!overlay) return;
-
-  stopAnalysisProgress();
-
-  // Reset steps to initial state: Step 1 active, Steps 2-5 pending
-  for (let i = 1; i <= 5; i++) {
-    const stepEl = document.getElementById(`analysis-step-${i}`);
-    const iconEl = document.getElementById(`step-icon-${i}`);
-    if (stepEl && iconEl) {
-      if (i === 1) {
-        stepEl.className = "analysis-step active";
-        iconEl.textContent = "•";
-      } else {
-        stepEl.className = "analysis-step pending";
-        iconEl.textContent = "·";
-      }
-    }
+  const textEl = document.getElementById("analysis-sentence-text");
+  if (textEl) {
+    textEl.textContent = ANALYSIS_SENTENCES[0];
   }
-
-  overlay.classList.remove("hidden");
-
-  // Step schedule: 450ms, 900ms, 1350ms, 1800ms
-  const advanceStep = (doneIdx, activeIdx, delay) => {
-    const timer = setTimeout(() => {
-      const prevStep = document.getElementById(`analysis-step-${doneIdx}`);
-      const prevIcon = document.getElementById(`step-icon-${doneIdx}`);
-      if (prevStep && prevIcon) {
-        prevStep.className = "analysis-step done";
-        prevIcon.textContent = "✓";
-      }
-
-      if (activeIdx <= 5) {
-        const nextStep = document.getElementById(`analysis-step-${activeIdx}`);
-        const nextIcon = document.getElementById(`step-icon-${activeIdx}`);
-        if (nextStep && nextIcon) {
-          nextStep.className = "analysis-step active";
-          nextIcon.textContent = "•";
-        }
-      }
-    }, delay);
-    analysisTimers.push(timer);
-  };
-
-  advanceStep(1, 2, 450);
-  advanceStep(2, 3, 900);
-  advanceStep(3, 4, 1350);
-  advanceStep(4, 5, 1800);
-
-  // Final checkmark on step 5
-  const finalTimer = setTimeout(() => {
-    const step5 = document.getElementById("analysis-step-5");
-    const icon5 = document.getElementById("step-icon-5");
-    if (step5 && icon5) {
-      step5.className = "analysis-step done";
-      icon5.textContent = "✓";
-    }
-  }, 2150);
-  analysisTimers.push(finalTimer);
+  if (overlay) {
+    overlay.classList.remove("hidden");
+  }
 }
 
-function stopAnalysisProgress() {
-  analysisTimers.forEach((t) => clearTimeout(t));
-  analysisTimers = [];
+function hideLoadingCard() {
   const overlay = document.getElementById("analysis-overlay");
   if (overlay) {
     overlay.classList.add("hidden");
+  }
+}
+
+function updateLoadingSentence(sentence) {
+  const textEl = document.getElementById("analysis-sentence-text");
+  if (textEl && textEl.textContent !== sentence) {
+    textEl.textContent = sentence;
   }
 }
 

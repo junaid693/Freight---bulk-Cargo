@@ -600,58 +600,18 @@
   <!-- Floating Back to Top Button -->
   <button id="btn-back-to-top" type="button" aria-label="Back to top" class="btn-back-to-top">↑</button>
 
-  <!-- Analysis Loading Overlay (Dark Charcoal & Sea-Blue Accent) -->
+  <!-- Simple White Enterprise Loading Card -->
   <div id="analysis-overlay" class="analysis-overlay hidden" aria-live="polite" role="status">
     <div class="analysis-card">
-      
-      <!-- Subtle Sea-Blue Animated Loading Indicator -->
-      <div class="analysis-radar-container">
-        <div class="analysis-radar-pulse"></div>
-        <div class="analysis-radar-core">
-          <svg class="w-5 h-5 text-sky-400 animate-spin-slow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
-          </svg>
+      <div class="analysis-card-content">
+        <svg class="analysis-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <div class="analysis-sentence-box">
+          <span id="analysis-sentence-text" class="analysis-sentence-text">Analyzing freight rates</span><span class="animated-dots" aria-hidden="true"><span class="dot dot-1">.</span><span class="dot dot-2">.</span><span class="dot dot-3">.</span></span>
         </div>
       </div>
-
-      <!-- Main Message -->
-      <h3 class="analysis-title mb-5">Analyzing shipment...</h3>
-
-      <!-- Progressive Processing Steps List -->
-      <div class="analysis-steps-list">
-        
-        <!-- Step 1 -->
-        <div class="analysis-step active" id="analysis-step-1">
-          <span class="step-indicator" id="step-icon-1">•</span>
-          <span class="step-text" id="step-text-1">Checking freight rates</span>
-        </div>
-
-        <!-- Step 2 -->
-        <div class="analysis-step pending" id="analysis-step-2">
-          <span class="step-indicator" id="step-icon-2">·</span>
-          <span class="step-text" id="step-text-2">Reviewing cargo prices</span>
-        </div>
-
-        <!-- Step 3 -->
-        <div class="analysis-step pending" id="analysis-step-3">
-          <span class="step-indicator" id="step-icon-3">·</span>
-          <span class="step-text" id="step-text-3">Checking weather conditions</span>
-        </div>
-
-        <!-- Step 4 -->
-        <div class="analysis-step pending" id="analysis-step-4">
-          <span class="step-indicator" id="step-icon-4">·</span>
-          <span class="step-text" id="step-text-4">Selecting suitable vessel</span>
-        </div>
-
-        <!-- Step 5 -->
-        <div class="analysis-step pending" id="analysis-step-5">
-          <span class="step-indicator" id="step-icon-5">·</span>
-          <span class="step-text" id="step-text-5">Calculating landed cost</span>
-        </div>
-
-      </div>
-
     </div>
   </div>
 
