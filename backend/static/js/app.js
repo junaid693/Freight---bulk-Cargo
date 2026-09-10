@@ -131,7 +131,19 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false, showAnalysis
   const commodity = document.getElementById("input-commodity").value;
   const origin = document.getElementById("input-origin").value;
   const destination = document.getElementById("input-destination").value;
-  const cargoTonnes = parseFloat(document.getElementById("input-cargo-tonnes").value) || 150000;
+  const cargoInputEl = document.getElementById("input-cargo-tonnes");
+  const rawCargoVal = cargoInputEl.value.trim();
+  const cargoTonnes = parseFloat(rawCargoVal);
+
+  if (!rawCargoVal || isNaN(cargoTonnes) || cargoTonnes <= 0) {
+    btnAnalyze.disabled = false;
+    spinner.classList.add("hidden");
+    btnText.textContent = "Analyze Shipment";
+    errorMessage.textContent = "Please enter a valid positive cargo volume in metric tonnes (e.g. 18,000).";
+    errorContainer.classList.remove("hidden");
+    cargoInputEl.focus();
+    return;
+  }
 
   appState.activeCommodity = commodity;
   appState.activeOrigin = origin;
@@ -576,7 +588,7 @@ function renderVesselOptions(data) {
   if (evaluated.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" class="text-center py-6 text-gray-500 text-xs">
+        <td colspan="6" class="text-center py-6 text-gray-500 text-xs">
           No vessel options available for this route.
         </td>
       </tr>
@@ -595,23 +607,47 @@ function renderVesselOptions(data) {
       tr.className = "row-ineligible";
     }
 
-    // Clean status badge
+    // Recommendation Status badge
     let statusCell = "";
     if (isRecommended) {
       statusCell = `<span class="badge badge-primary text-[11px]">Recommended</span>`;
     } else if (isEligible) {
-      statusCell = `<span class="badge badge-neutral text-[11px]">Available</span>`;
+      statusCell = `<span class="badge badge-neutral text-[11px]">Suitable</span>`;
     } else {
       statusCell = `<span class="badge badge-danger text-[10px]">Not suitable</span>`;
     }
 
-    const rateDisplay = item.predicted_freight_usd_per_tonne
-      ? `$${item.predicted_freight_usd_per_tonne.toFixed(2)}/t`
-      : "—";
+    // Estimated Freight rate + total outlay
+    let freightCell = "";
+    if (item.predicted_freight_usd_per_tonne && item.estimated_freight_outlay_usd) {
+      freightCell = `
+        <div>
+          <span class="font-mono text-xs font-semibold text-gray-900">$${item.predicted_freight_usd_per_tonne.toFixed(2)}/t</span>
+          <span class="text-gray-500 font-normal text-[11px]">($${Math.round(item.estimated_freight_outlay_usd).toLocaleString()})</span>
+        </div>
+      `;
+    } else {
+      freightCell = `<span class="text-gray-400 font-mono text-xs">—</span>`;
+    }
 
-    const utilDisplay = item.utilization_pct
-      ? `${Math.round(item.utilization_pct)}%`
-      : "—";
+    // Cargo Fit description
+    let cargoFitCell = "";
+    if (item.cargo_fit) {
+      const fitLabel = item.cargo_fit_label || (item.utilization_pct >= 80 ? "Optimal fit" : "Suitable");
+      const fitColor = isRecommended ? "text-emerald-700 font-medium" : "text-gray-700";
+      cargoFitCell = `<span class="${fitColor}">${escapeHtml(fitLabel)} (${Math.round(item.utilization_pct)}%)</span>`;
+    } else {
+      const fitLabel = item.cargo_fit_label || "Cargo exceeds capacity";
+      cargoFitCell = `<span class="text-rose-600 text-xs font-medium">${escapeHtml(fitLabel)}</span>`;
+    }
+
+    // Port / Draft Fit description
+    let portFitCell = "";
+    if (item.port_compatible) {
+      portFitCell = `<span class="text-gray-700 font-mono text-xs">${item.draft_m.toFixed(1)}m (Compatible)</span>`;
+    } else {
+      portFitCell = `<span class="text-rose-600 font-mono text-xs font-medium">${item.draft_m.toFixed(1)}m (Exceeds draft)</span>`;
+    }
 
     tr.innerHTML = `
       <td>
@@ -620,11 +656,14 @@ function renderVesselOptions(data) {
       <td class="font-mono text-xs text-gray-700">
         ${Math.round(item.standard_dwt).toLocaleString()} DWT
       </td>
-      <td class="font-mono text-xs font-semibold text-gray-900">
-        ${rateDisplay}
+      <td class="text-xs">
+        ${cargoFitCell}
       </td>
-      <td class="font-mono text-xs text-gray-700">
-        ${utilDisplay}
+      <td class="text-xs">
+        ${portFitCell}
+      </td>
+      <td>
+        ${freightCell}
       </td>
       <td>
         ${statusCell}

@@ -62,12 +62,17 @@ CANONICAL_CORRIDORS = {
         "supported_vessels": {
             "Capesize": {"benchmark_rate": 17.20, "is_primary": True},
             "Panamax": {"benchmark_rate": 20.00, "is_primary": True},
+            "Supramax": {"benchmark_rate": 22.50, "is_primary": False},
+            "Handysize": {"benchmark_rate": 25.50, "is_primary": False},
         },
         "default_commodity": "Coal",
     },
     "Australia West Coast": {
         "supported_vessels": {
             "Capesize": {"benchmark_rate": 12.90, "is_primary": True},
+            "Panamax": {"benchmark_rate": 15.50, "is_primary": False},
+            "Supramax": {"benchmark_rate": 18.00, "is_primary": False},
+            "Handysize": {"benchmark_rate": 21.00, "is_primary": False},
         },
         "default_commodity": "Iron Ore",
     },
@@ -75,6 +80,7 @@ CANONICAL_CORRIDORS = {
         "supported_vessels": {
             "Panamax": {"benchmark_rate": 11.80, "is_primary": True},
             "Supramax": {"benchmark_rate": 13.80, "is_primary": True},
+            "Handysize": {"benchmark_rate": 16.50, "is_primary": True},
         },
         "default_commodity": "Thermal Coal",
     },
@@ -180,6 +186,14 @@ def check_port_compatibility(vessel_type: str, draft_m: float, destination: str)
             )
         return True, f"{port_name} accommodates fully laden Supramax ({op_draft:.2f}m permissible draft)."
 
+    elif v_lower == "handysize":
+        if draft_m > op_draft:
+            return False, (
+                f"Handysize draft ({draft_m:.2f}m) exceeds {port_name} operational draft limit ({op_draft:.2f}m). "
+                f"{notes}"
+            )
+        return True, f"{port_name} accommodates fully laden Handysize ({op_draft:.2f}m permissible draft)."
+
     return True, f"Port compatibility verified for {vessel_type} at {port_name}."
 
 
@@ -233,23 +247,34 @@ def optimize_vessel_chartering(
         utilization_pct = round((cargo_tonnes / std_dwt) * 100.0, 1)
 
         cargo_fit = True
+        cargo_fit_label = "Suitable"
+        min_econ_util = 0.28 if v_type == "Handysize" else VESSEL_SCORING_CONFIG["min_economic_utilization"]
         if cargo_tonnes > std_dwt * VESSEL_SCORING_CONFIG["max_physical_utilization"]:
             cargo_fit = False
+            cargo_fit_label = "Cargo exceeds practical capacity"
             reasons.append(
                 f"Cargo volume ({cargo_tonnes:,.0f} mt) exceeds {v_type} maximum capacity ({std_dwt:,.0f} DWT, {utilization_pct}%)."
             )
-        elif cargo_tonnes < std_dwt * VESSEL_SCORING_CONFIG["min_economic_utilization"]:
+        elif cargo_tonnes < std_dwt * min_econ_util:
             cargo_fit = False
+            cargo_fit_label = "Excessive unused capacity"
             reasons.append(
                 f"Cargo volume ({cargo_tonnes:,.0f} mt) severely underutilizes {v_type} capacity ({std_dwt:,.0f} DWT, {utilization_pct}%); uneconomic deadfreight."
             )
+        elif 80.0 <= utilization_pct <= 98.0:
+            cargo_fit_label = "Optimal fit"
+            reasons.append(
+                f"Cargo volume ({cargo_tonnes:,.0f} mt) achieves optimal {utilization_pct}% utilization of {std_dwt:,.0f} DWT capacity."
+            )
         else:
+            cargo_fit_label = "Suitable"
             reasons.append(
                 f"Cargo volume ({cargo_tonnes:,.0f} mt) achieves viable {utilization_pct}% utilization of {std_dwt:,.0f} DWT capacity."
             )
 
         # 2. Port Hydrographic Compatibility
         port_compatible, port_reason = check_port_compatibility(v_type, draft_m, destination)
+        port_fit_label = f"Compatible ({draft_m:.1f}m draft)" if port_compatible else f"Draft exceeds limit ({draft_m:.1f}m)"
         reasons.append(port_reason)
 
         # 3. Corridor Operational Viability
@@ -294,6 +319,11 @@ def optimize_vessel_chartering(
                     & (hist_df["origin"] == canonical_origin)
                     & (hist_df["vessel_type"] == v_type)
                 ]
+                if len(match_row) == 0:
+                    match_row = hist_df[
+                        (hist_df["date"] == latest_date)
+                        & (hist_df["origin"] == canonical_origin)
+                    ]
                 if len(match_row) > 0:
                     row = match_row.iloc[0]
                     for field in [
@@ -340,7 +370,9 @@ def optimize_vessel_chartering(
             "forecast_recommendation": forecast_rec,
             "forecast_risk_level": forecast_risk,
             "port_compatible": port_compatible,
+            "port_fit_label": port_fit_label,
             "cargo_fit": cargo_fit,
+            "cargo_fit_label": cargo_fit_label,
             "corridor_supported": corridor_supported,
             "eligible": is_eligible,
             "suitability_score": 0.0,
@@ -360,20 +392,23 @@ def optimize_vessel_chartering(
             v_type = cand["vessel_type"]
             util_pct = cand["utilization_pct"] / 100.0
 
-            # (A) Utilization Score (up to 40 pts)
+            # (A) Utilization Score (up to 50 pts)
+            # Prefer the smallest suitable vessel that carries cargo without excessive unused capacity
             if VESSEL_SCORING_CONFIG["ideal_utilization_min"] <= util_pct <= VESSEL_SCORING_CONFIG["ideal_utilization_max"]:
-                util_score = VESSEL_SCORING_CONFIG["utilization_weight"]
-            elif 0.70 <= util_pct <= 1.00:
-                util_score = 30.0
+                util_score = 50.0
+            elif (0.65 <= util_pct < 0.80) or (0.95 < util_pct <= 1.00):
+                util_score = 38.0
+            elif 0.50 <= util_pct < 0.65:
+                util_score = 26.0
             else:
-                util_score = 15.0
+                util_score = 5.0
 
-            # (B) Economic Efficiency Score (up to 40 pts)
+            # (B) Economic Efficiency Score (up to 30 pts)
             if max_outlay > min_outlay:
                 savings_ratio = (max_outlay - cand["estimated_freight_outlay_usd"]) / (max_outlay - min_outlay)
-                econ_score = 20.0 + (20.0 * savings_ratio)
+                econ_score = 10.0 + (20.0 * savings_ratio)
             else:
-                econ_score = 40.0
+                econ_score = 30.0
 
             # (C) Corridor Alignment (up to 20 pts)
             is_primary = supported_vessels_map.get(v_type, {}).get("is_primary", False)

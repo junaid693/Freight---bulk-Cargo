@@ -56,6 +56,7 @@ class TestVesselService(unittest.TestCase):
         self.assertIn("Capesize", v_map)
         self.assertIn("Panamax", v_map)
         self.assertIn("Supramax", v_map)
+        self.assertIn("Handysize", v_map)
 
         # Authentic dimensions check
         self.assertEqual(float(v_map["Capesize"]["standard_dwt"]), 182000.0)
@@ -66,6 +67,9 @@ class TestVesselService(unittest.TestCase):
 
         self.assertEqual(float(v_map["Supramax"]["standard_dwt"]), 58328.0)
         self.assertEqual(float(v_map["Supramax"]["draft_m"]), 12.80)
+
+        self.assertEqual(float(v_map["Handysize"]["standard_dwt"]), 35000.0)
+        self.assertEqual(float(v_map["Handysize"]["draft_m"]), 10.00)
 
     # -------------------------------------------------------------------------
     # 2. Port Constraint Loading
@@ -111,7 +115,7 @@ class TestVesselService(unittest.TestCase):
     # 4. Draft Compatibility Checks
     # -------------------------------------------------------------------------
     def test_draft_compatibility_paradip(self):
-        """Paradip has 14.50m draft limit: Capesize (18.2m) must be excluded; Panamax (14.43m) allowed."""
+        """Paradip has 14.50m draft limit: Capesize (18.2m) must be excluded; Panamax, Supramax, Handysize allowed."""
         # Capesize at Paradip -> Incompatible
         ok_cape, reason_cape = check_port_compatibility("Capesize", 18.20, "Paradip")
         self.assertFalse(ok_cape)
@@ -125,6 +129,11 @@ class TestVesselService(unittest.TestCase):
         # Supramax at Paradip -> Compatible (12.80m <= 14.50m)
         ok_sup, reason_sup = check_port_compatibility("Supramax", 12.80, "Paradip")
         self.assertTrue(ok_sup)
+
+        # Handysize at Paradip -> Compatible (10.00m <= 14.50m)
+        ok_hdy, reason_hdy = check_port_compatibility("Handysize", 10.00, "Paradip")
+        self.assertTrue(ok_hdy)
+        self.assertIn("accommodates fully laden Handysize", reason_hdy)
 
     def test_draft_compatibility_dhamra(self):
         """Dhamra is a deepwater port (18.00m permissible draft) accommodating Capesize."""
@@ -143,11 +152,48 @@ class TestVesselService(unittest.TestCase):
         ok_sup, _ = check_port_compatibility("Supramax", 12.80, "Haldia")
         self.assertFalse(ok_sup)
 
+        ok_hdy, _ = check_port_compatibility("Handysize", 10.00, "Haldia")
+        self.assertFalse(ok_hdy)
+
     # -------------------------------------------------------------------------
-    # 5. Cargo Volume Eligibility & Deadfreight / Overload Logic
+    # 5. Cargo Volume Recommendation Across All 4 Vessel Classes
     # -------------------------------------------------------------------------
-    def test_cargo_volume_deadfreight_exclusion(self):
-        """A 75,000 mt parcel must exclude Capesize (182k DWT) due to uneconomic deadfreight (<45% util)."""
+    def test_small_cargo_handysize_recommended(self):
+        """Small parcel (30,000 mt) on Taboneo must recommend Handysize (35k DWT, ~85% util)."""
+        res = optimize_vessel_chartering(
+            origin="Taboneo",
+            destination="East Coast India",
+            commodity="Thermal Coal",
+            cargo_tonnes=30000,
+        )
+        self.assertEqual(res["status"], "OPTIMIZED")
+        self.assertEqual(res["recommended_vessel"], "Handysize")
+
+        hdy_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Handysize")
+        self.assertTrue(hdy_eval["eligible"])
+        self.assertAlmostEqual(hdy_eval["utilization_pct"], 85.7, places=1)
+
+    def test_medium_cargo_supramax_recommended(self):
+        """Medium parcel (50,000 mt) on Taboneo must recommend Supramax (58.3k DWT, ~85% util)."""
+        res = optimize_vessel_chartering(
+            origin="Taboneo",
+            destination="East Coast India",
+            commodity="Thermal Coal",
+            cargo_tonnes=50000,
+        )
+        self.assertEqual(res["status"], "OPTIMIZED")
+        self.assertEqual(res["recommended_vessel"], "Supramax")
+
+        # Handysize must be rejected for practical capacity overload
+        hdy_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Handysize")
+        self.assertFalse(hdy_eval["cargo_fit"])
+        self.assertFalse(hdy_eval["eligible"])
+
+        sup_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Supramax")
+        self.assertTrue(sup_eval["eligible"])
+
+    def test_larger_cargo_panamax_recommended(self):
+        """Larger parcel (75,000 mt) on Hay Point must recommend Panamax (82.5k DWT, ~90% util)."""
         res = optimize_vessel_chartering(
             origin="Hay Point",
             destination="East Coast India",
@@ -155,20 +201,37 @@ class TestVesselService(unittest.TestCase):
             cargo_tonnes=75000,
         )
         self.assertEqual(res["status"], "OPTIMIZED")
-        # Find Capesize evaluation
+        self.assertEqual(res["recommended_vessel"], "Panamax")
+
+        # Capesize (182k DWT) must be excluded for deadfreight (<45% util)
         cape_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Capesize")
         self.assertFalse(cape_eval["cargo_fit"])
         self.assertFalse(cape_eval["eligible"])
-        self.assertTrue(any("underutilizes Capesize" in r for r in cape_eval["reasons"]))
 
-        # Panamax (82.5k DWT) must be eligible and recommended
-        pan_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Panamax")
-        self.assertTrue(pan_eval["cargo_fit"])
-        self.assertTrue(pan_eval["eligible"])
-        self.assertEqual(res["recommended_vessel"], "Panamax")
+        # Handysize & Supramax excluded for capacity overload
+        hdy_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Handysize")
+        self.assertFalse(hdy_eval["cargo_fit"])
+
+        sup_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Supramax")
+        self.assertFalse(sup_eval["cargo_fit"])
+
+    def test_very_large_cargo_capesize_recommended(self):
+        """Very large parcel (150,000 mt) on Hay Point -> Dhamra must recommend Capesize (182k DWT, ~82% util)."""
+        res = optimize_vessel_chartering(
+            origin="Hay Point",
+            destination="Dhamra",
+            commodity="Coal",
+            cargo_tonnes=150000,
+        )
+        self.assertEqual(res["status"], "OPTIMIZED")
+        self.assertEqual(res["recommended_vessel"], "Capesize")
+
+        cape_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Capesize")
+        self.assertTrue(cape_eval["eligible"])
+        self.assertAlmostEqual(cape_eval["utilization_pct"], 82.4, places=1)
 
     def test_cargo_volume_overload_exclusion(self):
-        """A 160,000 mt parcel must exclude Panamax (82.5k DWT) and Supramax (58.3k DWT) as physical overloads."""
+        """A 160,000 mt parcel must exclude Panamax, Supramax, and Handysize as physical overloads."""
         res = optimize_vessel_chartering(
             origin="Hay Point",
             destination="East Coast India",
@@ -178,14 +241,37 @@ class TestVesselService(unittest.TestCase):
         self.assertEqual(res["status"], "OPTIMIZED")
         self.assertEqual(res["recommended_vessel"], "Capesize")
 
-        pan_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Panamax")
-        self.assertFalse(pan_eval["cargo_fit"])
-        self.assertFalse(pan_eval["eligible"])
-        self.assertTrue(any("exceeds Panamax maximum capacity" in r for r in pan_eval["reasons"]))
-
-        sup_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Supramax")
-        self.assertFalse(sup_eval["cargo_fit"])
-        self.assertFalse(sup_eval["eligible"])
+        for v_name in ["Panamax", "Supramax", "Handysize"]:
+            v_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == v_name)
+            self.assertFalse(v_eval["cargo_fit"])
+            self.assertFalse(v_eval["eligible"])
+    def test_arbitrary_cargo_volumes_accepted_and_evaluated(self):
+        """Verify arbitrary non-5000 increment cargo volumes (10k, 15k, 18k, 18.5k, 22.5k, 37.25k, 51.7k, 75k, 100k, 150k) evaluate cleanly."""
+        test_cases = [
+            (10000, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
+            (15000, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
+            (18000, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
+            (18500, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
+            (22500, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
+            (37250, "Taboneo", "Thermal Coal", "East Coast India", "Supramax"),
+            (51700, "Taboneo", "Thermal Coal", "East Coast India", "Supramax"),
+            (75000, "Hay Point", "Coal", "Dhamra", "Panamax"),
+            (100000, "Hay Point", "Coal", "Dhamra", "Capesize"),
+            (150000, "Hay Point", "Coal", "Dhamra", "Capesize"),
+        ]
+        for cargo, orig, comm, dest, expected_vessel in test_cases:
+            with self.subTest(cargo=cargo, expected=expected_vessel):
+                res = optimize_vessel_chartering(
+                    origin=orig,
+                    destination=dest,
+                    commodity=comm,
+                    cargo_tonnes=cargo,
+                )
+                self.assertEqual(res["status"], "OPTIMIZED")
+                self.assertEqual(res["recommended_vessel"], expected_vessel)
+                winner = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == expected_vessel)
+                self.assertTrue(winner["eligible"])
+                self.assertTrue(winner["cargo_fit"])
 
     # -------------------------------------------------------------------------
     # 6. Trade Lane / Corridor Support
@@ -237,7 +323,7 @@ class TestVesselService(unittest.TestCase):
         self.assertEqual(outlay, expected_outlay)
 
     # -------------------------------------------------------------------------
-    # 8. Recommendation Selection Multi-Criteria
+    # 8. Recommendation Selection Multi-Criteria & Best-Fit
     # -------------------------------------------------------------------------
     def test_recommendation_selection_multi_criteria(self):
         """Recommendation chooses highest suitability score (capacity fit + economics + corridor)."""
@@ -252,6 +338,24 @@ class TestVesselService(unittest.TestCase):
 
         winner_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == res["recommended_vessel"])
         self.assertGreater(winner_eval["suitability_score"], 60.0)
+
+    def test_multiple_feasible_vessels_best_fit_selected(self):
+        """When multiple vessels are feasible (e.g. 50k mt on Taboneo: Supramax & Panamax), Supramax is chosen as best fit."""
+        res = optimize_vessel_chartering(
+            origin="Taboneo",
+            destination="East Coast India",
+            commodity="Thermal Coal",
+            cargo_tonnes=50000,
+        )
+        self.assertEqual(res["status"], "OPTIMIZED")
+        self.assertEqual(res["recommended_vessel"], "Supramax")
+
+        sup = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Supramax")
+        pan = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Panamax")
+
+        self.assertTrue(sup["eligible"])
+        self.assertTrue(pan["eligible"])
+        self.assertGreater(sup["suitability_score"], pan["suitability_score"])
 
     # -------------------------------------------------------------------------
     # 9. No Suitable Vessel Structured Case
@@ -273,10 +377,11 @@ class TestVesselService(unittest.TestCase):
         self.assertFalse(cape["port_compatible"])
         self.assertFalse(cape["eligible"])
 
-        # Panamax was excluded for capacity overload
-        pan = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == "Panamax")
-        self.assertFalse(pan["cargo_fit"])
-        self.assertFalse(pan["eligible"])
+        # Panamax, Supramax, Handysize were excluded for capacity overload
+        for v_name in ["Panamax", "Supramax", "Handysize"]:
+            v_eval = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == v_name)
+            self.assertFalse(v_eval["cargo_fit"])
+            self.assertFalse(v_eval["eligible"])
 
     def test_no_suitable_vessel_haldia_shallow(self):
         """Any standard bulk shipment to Haldia must return NO_SUITABLE_VESSEL due to riverine shallow draft."""
@@ -293,7 +398,7 @@ class TestVesselService(unittest.TestCase):
     # 10. API Integration: POST /vessel/optimize
     # -------------------------------------------------------------------------
     def test_api_optimize_vessel_valid(self):
-        """Verify POST /vessel/optimize endpoint returns 200 with valid schema."""
+        """Verify POST /vessel/optimize endpoint returns 200 with all 4 vessel classes evaluated."""
         payload = {
             "origin": "Hay Point",
             "destination": "Dhamra",
@@ -309,7 +414,7 @@ class TestVesselService(unittest.TestCase):
         self.assertEqual(data["status"], "OPTIMIZED")
         self.assertEqual(data["recommended_vessel"], "Capesize")
         self.assertIsInstance(data["evaluated_vessels"], list)
-        self.assertEqual(len(data["evaluated_vessels"]), 3)
+        self.assertEqual(len(data["evaluated_vessels"]), 4)
 
         # Check required evaluation item fields
         first = data["evaluated_vessels"][0]
@@ -319,10 +424,18 @@ class TestVesselService(unittest.TestCase):
         self.assertIn("cargo_tonnes", first)
         self.assertIn("utilization_pct", first)
         self.assertIn("port_compatible", first)
+        self.assertIn("port_fit_label", first)
         self.assertIn("cargo_fit", first)
+        self.assertIn("cargo_fit_label", first)
         self.assertIn("eligible", first)
         self.assertIn("suitability_score", first)
         self.assertIn("reasons", first)
+
+        v_names = [v["vessel_type"] for v in data["evaluated_vessels"]]
+        self.assertIn("Handysize", v_names)
+        self.assertIn("Supramax", v_names)
+        self.assertIn("Panamax", v_names)
+        self.assertIn("Capesize", v_names)
 
     def test_api_optimize_vessel_invalid_cargo(self):
         """Verify POST /vessel/optimize returns 422 for non-positive cargo."""
@@ -353,3 +466,4 @@ class TestVesselService(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

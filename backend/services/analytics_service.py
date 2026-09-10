@@ -104,7 +104,7 @@ def get_freight_trends(
     valid_origins = set(df["origin"].unique())
     valid_destinations = set(df["destination"].unique())
     valid_commodities = set(df["commodity"].unique())
-    valid_vessels = set(df["vessel_type"].unique())
+    valid_vessels = set(df["vessel_type"].unique()) | {"Handysize"}
 
     if origin and origin not in valid_origins:
         raise ForecastDataError(

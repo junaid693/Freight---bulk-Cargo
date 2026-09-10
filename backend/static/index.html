@@ -153,7 +153,7 @@
           <!-- Cargo Volume -->
           <div>
             <label for="input-cargo-tonnes" class="block text-xs font-medium text-gray-700 mb-1">Cargo Volume (tonnes)</label>
-            <input id="input-cargo-tonnes" type="number" step="5000" min="10000" max="300000" value="150000" class="form-input font-mono text-sm" />
+            <input id="input-cargo-tonnes" type="number" step="1" min="1000" max="500000" value="150000" class="form-input font-mono text-sm" placeholder="e.g. 50000" required />
           </div>
 
           <!-- Submit Action -->
@@ -375,17 +375,18 @@
           <table class="saas-table">
             <thead>
               <tr>
-                <th>Vessel</th>
-                <th>Capacity</th>
-                <th>Freight</th>
-                <th>Utilization</th>
-                <th>Status</th>
+                <th>Vessel Class</th>
+                <th>Capacity (DWT)</th>
+                <th>Cargo Fit</th>
+                <th>Port / Draft Fit</th>
+                <th>Estimated Freight</th>
+                <th>Recommendation</th>
               </tr>
             </thead>
             <tbody id="vessel-options-body">
-              <!-- Populated dynamically with clean simple labels -->
+              <!-- Populated dynamically from backend calculations -->
               <tr>
-                <td colspan="5" class="text-center py-6 text-gray-500 text-xs">Loading vessel options...</td>
+                <td colspan="6" class="text-center py-6 text-gray-500 text-xs">Loading vessel options...</td>
               </tr>
             </tbody>
           </table>

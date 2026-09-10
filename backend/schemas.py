@@ -714,7 +714,7 @@ class VesselOptimizationRequest(BaseModel):
 class VesselEvaluationItem(BaseModel):
     """Evaluation result for an individual vessel class."""
 
-    vessel_type: str = Field(..., description="Vessel class (Capesize, Panamax, Supramax)")
+    vessel_type: str = Field(..., description="Vessel class (Capesize, Panamax, Supramax, Handysize)")
     standard_dwt: float = Field(..., description="Baltic Exchange standard deadweight tonnage")
     draft_m: float = Field(..., description="Vessel fully laden draft in meters")
     cargo_tonnes: float = Field(..., description="Evaluated cargo volume in metric tonnes")
@@ -735,7 +735,9 @@ class VesselEvaluationItem(BaseModel):
         None, description="Model v3 weather risk band ('LOW', 'MEDIUM', 'HIGH')"
     )
     port_compatible: bool = Field(..., description="Physical draft and berth feasibility at discharge port")
+    port_fit_label: Optional[str] = Field(None, description="Human-readable port draft feasibility summary")
     cargo_fit: bool = Field(..., description="Cargo volume compatibility with vessel deadweight")
+    cargo_fit_label: Optional[str] = Field(None, description="Human-readable cargo utilization fit summary")
     corridor_supported: bool = Field(..., description="Whether vessel class operates on this trade lane")
     eligible: bool = Field(..., description="Overall eligibility gate (port_compatible AND cargo_fit AND corridor_supported)")
     suitability_score: float = Field(..., description="Suitability score on a 0-100 scale")
