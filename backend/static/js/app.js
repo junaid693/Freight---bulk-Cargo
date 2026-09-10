@@ -132,16 +132,52 @@ async function runShipmentAnalysis(opts = { scrollOnSuccess: false, showAnalysis
   const origin = document.getElementById("input-origin").value;
   const destination = document.getElementById("input-destination").value;
   const cargoInputEl = document.getElementById("input-cargo-tonnes");
-  const rawCargoVal = cargoInputEl.value.trim();
-  const cargoTonnes = parseFloat(rawCargoVal);
+  const rawInput = (cargoInputEl.value || "").trim().replace(/,/g, "");
 
-  if (!rawCargoVal || isNaN(cargoTonnes) || cargoTonnes <= 0) {
+  function showValidationError(msg) {
     btnAnalyze.disabled = false;
     spinner.classList.add("hidden");
     btnText.textContent = "Analyze Shipment";
-    errorMessage.textContent = "Please enter a valid positive cargo volume in metric tonnes (e.g. 18,000).";
+    errorMessage.textContent = msg;
     errorContainer.classList.remove("hidden");
     cargoInputEl.focus();
+  }
+
+  // 1. Empty Check
+  if (!rawInput) {
+    showValidationError("Please enter a cargo volume in metric tonnes (e.g. 12345).");
+    return;
+  }
+
+  // 2. Non-numeric / letters check
+  if (!/^-?\d+(\.\d+)?$/.test(rawInput)) {
+    showValidationError("Please enter a valid whole number (digits only, e.g. 46038).");
+    return;
+  }
+
+  // 3. Decimal check (reject decimals with specific message)
+  if (rawInput.includes(".")) {
+    showValidationError("Please enter a whole number of tonnes (no decimals).");
+    return;
+  }
+
+  const cargoTonnes = parseInt(rawInput, 10);
+
+  // 4. Positive check
+  if (isNaN(cargoTonnes) || cargoTonnes <= 0) {
+    showValidationError("Cargo volume must be a positive number.");
+    return;
+  }
+
+  // 5. Minimum cargo limit (10,000 mt = smallest standard Handysize parcel)
+  if (cargoTonnes < 10000) {
+    showValidationError("Cargo volume must be at least 10,000 tonnes (smallest standard Handysize parcel).");
+    return;
+  }
+
+  // 6. Maximum cargo limit (200,000 mt = Capesize physical maximum)
+  if (cargoTonnes > 200000) {
+    showValidationError("Cargo volume cannot exceed 200,000 tonnes (maximum Capesize capacity).");
     return;
   }
 

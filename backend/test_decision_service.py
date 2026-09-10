@@ -470,8 +470,12 @@ class TestDecisionOrchestrationService(unittest.TestCase):
         self.assertEqual(err["error_code"], "INVALID_DECISION_INPUT")
 
     def test_api_analyze_arbitrary_cargo_volumes_accepted_unrounded(self):
-        """Verify POST /decision/analyze accepts arbitrary unrounded volumes (165700, 165701, 12345, 18500, 37250, etc.)."""
-        test_volumes = [10000, 12345, 15000, 15750, 18000, 18500, 22375, 37250, 51700, 75000, 100000, 125500, 150000, 165700, 165701, 170000]
+        """Verify POST /decision/analyze accepts all arbitrary unrounded custom whole-tonne volumes."""
+        test_volumes = [
+            10000, 10001, 12345, 12346, 15000, 15001, 15750, 18000, 18437, 18500,
+            22375, 25001, 37250, 46038, 51700, 51729, 75000, 75001, 82741,
+            100001, 100123, 125500, 127843, 150000, 150001, 165700, 169999, 170000, 181999
+        ]
         for vol in test_volumes:
             with self.subTest(cargo_volume=vol):
                 payload = {
