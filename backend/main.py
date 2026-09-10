@@ -486,8 +486,15 @@ if _STATIC_DIR.exists():
 
     @app.get("/")
     def frontend():
-        """Serve the single-page freight forecasting UI."""
+        """Serve the single-page freight forecasting UI with strict no-cache headers."""
         index = _STATIC_DIR / "index.html"
         if index.exists():
-            return FileResponse(str(index))
+            return FileResponse(
+                str(index),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         return {"message": "Frontend not found. Use /docs for API."}

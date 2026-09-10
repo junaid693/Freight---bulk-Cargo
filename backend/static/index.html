@@ -36,7 +36,7 @@
     };
   </script>
 
-  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=3.1" />
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col font-sans">
 
@@ -153,7 +153,7 @@
           <!-- Cargo Volume -->
           <div>
             <label for="input-cargo-tonnes" class="block text-xs font-medium text-gray-700 mb-1">Cargo Volume (tonnes)</label>
-            <input id="input-cargo-tonnes" type="number" step="1" min="1000" max="500000" value="150000" class="form-input font-mono text-sm" placeholder="e.g. 50000" required />
+            <input id="input-cargo-tonnes" type="number" step="any" min="1" max="500000" value="150000" class="form-input font-mono text-sm" placeholder="e.g. 165700" required />
           </div>
 
           <!-- Submit Action -->
@@ -617,6 +617,6 @@
   </div>
 
   <!-- Application Logic Modules -->
-  <script type="module" src="/static/js/app.js"></script>
+  <script type="module" src="/static/js/app.js?v=3.1"></script>
 </body>
 </html>

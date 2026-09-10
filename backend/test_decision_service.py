@@ -469,6 +469,26 @@ class TestDecisionOrchestrationService(unittest.TestCase):
         err = resp.json()
         self.assertEqual(err["error_code"], "INVALID_DECISION_INPUT")
 
+    def test_api_analyze_arbitrary_cargo_volumes_accepted_unrounded(self):
+        """Verify POST /decision/analyze accepts arbitrary unrounded volumes (165700, 165701, 12345, 18500, 37250, etc.)."""
+        test_volumes = [10000, 12345, 15000, 15750, 18000, 18500, 22375, 37250, 51700, 75000, 100000, 125500, 150000, 165700, 165701, 170000]
+        for vol in test_volumes:
+            with self.subTest(cargo_volume=vol):
+                payload = {
+                    "origin": "Taboneo" if vol <= 55000 else "Hay Point",
+                    "destination": "East Coast India" if vol <= 55000 else "Dhamra",
+                    "commodity": "Thermal Coal" if vol <= 55000 else "Coal",
+                    "cargo_tonnes": vol,
+                }
+                resp = self.client.post("/decision/analyze", json=payload)
+                self.assertEqual(resp.status_code, 200, f"Failed on volume {vol}: {resp.text}")
+                data = resp.json()
+                # Verify exact value is preserved without rounding
+                self.assertEqual(data["cargo_tonnes"], float(vol))
+                self.assertEqual(data["vessel"]["status"], "OPTIMIZED")
+                self.assertIsNotNone(data["vessel"]["recommended_vessel"])
+
 
 if __name__ == "__main__":
     unittest.main()
+
