@@ -336,8 +336,14 @@ def predict_freight(data: dict) -> dict:
         recommendation, reason = compute_recommendation(change_percent, risk_level)
 
         return {
+            "base_forecast": ts_res.get("base_forecast", round(predicted, 2)),
+            "operational_adjustment": ts_res.get("operational_adjustment", 0.0),
             "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
             "predicted_freight_usd_per_tonne": round(predicted, 2),
+            "expected_freight": ts_res.get("expected_freight", round(predicted, 2)),
+            "forecast_low": ts_res.get("forecast_low"),
+            "forecast_high": ts_res.get("forecast_high"),
+            "model_validation_mae": ts_res.get("model_validation_mae"),
             "current_freight_usd_per_tonne": round(current, 2),
             "forecast_change_usd_per_tonne": round(change_usd, 2),
             "forecast_change_percent": round(change_percent, 2),
@@ -384,8 +390,11 @@ def predict_freight(data: dict) -> dict:
     explanation = compute_explanation(data, current, predicted, raw_delta, bounded_delta, model)
 
     return {
+        "base_forecast": round(predicted, 2),
+        "operational_adjustment": 0.0,
         "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
         "predicted_freight_usd_per_tonne": round(predicted, 2),
+        "expected_freight": round(predicted, 2),
         "current_freight_usd_per_tonne": round(current, 2),
         "forecast_change_usd_per_tonne": round(change_usd, 2),
         "forecast_change_percent": round(change_percent, 2),

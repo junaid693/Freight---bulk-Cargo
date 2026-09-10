@@ -67,7 +67,6 @@ REQUIRED_FROM_USER = {
     "current_freight_usd_per_tonne",
 }
 
-
 def _parse_iso_utc(ts_str: str) -> Optional[datetime]:
     """Parse ISO timestamp string into timezone-aware UTC datetime."""
     try:
@@ -157,7 +156,7 @@ def build_forecast_input(user_input: dict) -> tuple[dict, dict]:
         val = user_input.get(field)
         if val is not None:
             merged[field] = val
-            sources[field] = "user"
+            sources[field] = "user:USER_PROVIDED"
 
     # Identity fields must come from user
     missing_identity = [f for f in REQUIRED_FROM_USER if f not in merged or merged[f] is None]

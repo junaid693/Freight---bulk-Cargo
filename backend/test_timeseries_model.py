@@ -328,6 +328,80 @@ class TestTimeSeriesModel(unittest.TestCase):
         rec_flat, _ = compute_recommendation(1.5, "LOW")
         self.assertEqual(rec_flat, "MONITOR")
 
+    # 13. Dynamic Inference State on Spot Rate Shifts
+    def test_dynamic_spot_rate_updating(self):
+        # Baseline rate for Hay Point Capesize was $17.20
+        base_payload = {
+            "origin": "Hay Point",
+            "destination": "East Coast India",
+            "commodity": "Coal",
+            "vessel_type": "Capesize",
+            "current_freight_usd_per_tonne": 17.20,
+            "bdi": 1560,
+            "vlsfo_usd_per_tonne": 638,
+            "coal_price_usd_per_mt": 124,
+            "iron_ore_price_usd_per_dmt": 124,
+            "wind_kmh": 20,
+            "wave_height_m": 1.2,
+            "cyclone_risk": 1,
+            "weather_delay_days": 0.0,
+        }
+        res_baseline = predict_freight(base_payload)
+        self.assertFalse(res_baseline["explanation"]["anchor"]["dynamic_state_updated"])
+
+        # Upward spot rate shock ($19.50 vs $17.20)
+        up_payload = dict(base_payload)
+        up_payload["current_freight_usd_per_tonne"] = 19.50
+        res_up = predict_freight(up_payload)
+        self.assertTrue(res_up["explanation"]["anchor"]["dynamic_state_updated"])
+        self.assertGreater(res_up["explanation"]["anchor"]["innovation_residual"], 0.0)
+
+        # Downward spot rate shock ($14.50 vs $17.20)
+        down_payload = dict(base_payload)
+        down_payload["current_freight_usd_per_tonne"] = 14.50
+        res_down = predict_freight(down_payload)
+        self.assertTrue(res_down["explanation"]["anchor"]["dynamic_state_updated"])
+        self.assertLess(res_down["explanation"]["anchor"]["innovation_residual"], 0.0)
+
+    # 14. Empirical Uncertainty Bounds Exposure
+    def test_empirical_uncertainty_bounds(self):
+        sample = CANONICAL_PAYLOADS[0]["payload"]
+        res = predict_freight(sample)
+
+        self.assertIn("expected_freight", res)
+        self.assertIn("forecast_low", res)
+        self.assertIn("forecast_high", res)
+        self.assertIn("model_validation_mae", res)
+
+        low = res["forecast_low"]
+        exp = res["expected_freight"]
+        high = res["forecast_high"]
+        mae = res["model_validation_mae"]
+
+        self.assertIsInstance(low, float)
+        self.assertIsInstance(high, float)
+        self.assertIsInstance(exp, float)
+        self.assertIsInstance(mae, float)
+
+        self.assertLessEqual(low, exp)
+        self.assertLessEqual(exp, high)
+        self.assertGreater(mae, 0.0)
+
+    # 15. Honest Explainability Mathematical Sum-to-Delta
+    def test_honest_explainability_sum_to_delta(self):
+        for item in CANONICAL_PAYLOADS:
+            res = predict_freight(item["payload"])
+            expl = res["explanation"]
+            drivers = expl["drivers"]
+            anchor = expl["anchor"]
+
+            self.assertGreaterEqual(len(drivers), 13)
+            total_contrib = sum(d["contribution_usd_per_tonne"] for d in drivers)
+            intercept = anchor["model_intercept"]
+            raw_delta = anchor["raw_predicted_delta_usd_per_tonne"]
+
+            self.assertAlmostEqual(total_contrib + intercept, raw_delta, places=2)
+
 
 if __name__ == "__main__":
     unittest.main()

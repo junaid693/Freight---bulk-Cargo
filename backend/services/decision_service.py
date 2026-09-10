@@ -274,6 +274,14 @@ def analyze_decision(
             "predicted_freight_usd_per_tonne": pred_rate,
             "estimated_freight_outlay_usd": outlay,
             "suitability_score": winning_vessel.get("suitability_score"),
+            "base_forecast": winning_vessel.get("base_forecast"),
+            "operational_adjustment": winning_vessel.get("operational_adjustment"),
+            "expected_freight": pred_rate,
+            "forecast_low": winning_vessel.get("forecast_low"),
+            "forecast_high": winning_vessel.get("forecast_high"),
+            "model_validation_mae": winning_vessel.get("model_validation_mae"),
+            "direction": winning_vessel.get("direction"),
+            "market_data_provenance": winning_vessel.get("market_data_provenance"),
             "reasons": winning_vessel.get("reasons", []),
             "evaluated_vessels": vessel_res.get("evaluated_vessels", []),
         }
@@ -301,6 +309,9 @@ def analyze_decision(
             "Delivered Acquisition Cost: Estimated Landed Cost is unavailable because no suitable vessel could be chartered."
         )
 
+    # Independent Cargo Decision
+    cargo_decision = "BUY CARGO" if proc_signal == "BUY" else ("WAIT TO BUY" if proc_signal == "WAIT" else "MONITOR CARGO")
+
     return {
         "commodity": proc_res["commodity"],
         "origin": vessel_res["origin"],
@@ -318,6 +329,7 @@ def analyze_decision(
         },
         "vessel": vessel_summary,
         "landed_cost": landed_cost_res,
+        "cargo_decision": cargo_decision,
         "charter_decision": charter_decision,
         "overall_strategy": overall_strategy,
         "weather_override": weather_override,

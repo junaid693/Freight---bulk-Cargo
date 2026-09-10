@@ -242,13 +242,21 @@ def optimize_vessel_chartering(
         draft_m = float(v_row["draft_m"])
 
         reasons: list[str] = []
+        base_fc = None
+        op_adj = None
+        fc_low = None
+        fc_high = None
+        val_mae = None
+        dir_label = None
+        mkt_prov = None
+
         
         # 1. Utilization & Cargo Volume Fit
         utilization_pct = round((cargo_tonnes / std_dwt) * 100.0, 1)
 
         cargo_fit = True
         cargo_fit_label = "Suitable"
-        min_econ_util = 0.28 if v_type == "Handysize" else VESSEL_SCORING_CONFIG["min_economic_utilization"]
+        min_econ_util = VESSEL_SCORING_CONFIG["min_economic_utilization"]
         if cargo_tonnes > std_dwt * VESSEL_SCORING_CONFIG["max_physical_utilization"]:
             cargo_fit = False
             cargo_fit_label = "Cargo exceeds practical capacity"
@@ -354,6 +362,13 @@ def optimize_vessel_chartering(
                 forecast_change_pct = float(forecast_res.get("forecast_change_percent", 0.0))
                 forecast_rec = str(forecast_res.get("recommendation", "MONITOR"))
                 forecast_risk = str(forecast_res.get("risk_level", "LOW"))
+                base_fc = float(forecast_res.get("base_forecast", pred_freight))
+                op_adj = float(forecast_res.get("operational_adjustment", 0.0))
+                fc_low = float(forecast_res.get("forecast_low", pred_freight))
+                fc_high = float(forecast_res.get("forecast_high", pred_freight))
+                val_mae = float(forecast_res.get("model_validation_mae", 1.1078))
+                dir_label = str(forecast_res.get("direction", "STABLE"))
+                mkt_prov = str(forecast_res.get("market_data_provenance", "HISTORICAL_FALLBACK"))
             except Exception as exc:
                 is_eligible = False
                 reasons.append(f"Model v3 forecast failed: {exc}")
@@ -369,6 +384,14 @@ def optimize_vessel_chartering(
             "forecast_change_percent": forecast_change_pct,
             "forecast_recommendation": forecast_rec,
             "forecast_risk_level": forecast_risk,
+            "base_forecast": base_fc if is_eligible else None,
+            "operational_adjustment": op_adj if is_eligible else None,
+            "expected_freight": pred_freight if is_eligible else None,
+            "forecast_low": fc_low if is_eligible else None,
+            "forecast_high": fc_high if is_eligible else None,
+            "model_validation_mae": val_mae if is_eligible else None,
+            "direction": dir_label if is_eligible else None,
+            "market_data_provenance": mkt_prov if is_eligible else None,
             "port_compatible": port_compatible,
             "port_fit_label": port_fit_label,
             "cargo_fit": cargo_fit,

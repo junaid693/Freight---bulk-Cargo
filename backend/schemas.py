@@ -1,8 +1,18 @@
 """Pydantic request/response schemas for the freight forecasting API, Market Intelligence, and Dashboard."""
 
+from enum import Enum
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
+
+
+class MarketProvenanceState(str, Enum):
+    """Explicit data provenance states for market indicators."""
+
+    LIVE = "LIVE"
+    HISTORICAL_FALLBACK = "HISTORICAL_FALLBACK"
+    USER_PROVIDED = "USER_PROVIDED"
+    UNAVAILABLE = "UNAVAILABLE"
 
 
 class FreightRequest(BaseModel):
@@ -104,6 +114,9 @@ class ExplanationAnchor(BaseModel):
     model_intercept: float = Field(..., description="Global baseline intercept term")
     residual_guardrail_applied: bool = Field(..., description="Whether clipping/sanity boundary was triggered")
     physical_floor_applied: bool = Field(..., description="Whether >= 1.0 USD/tonne floor was triggered")
+    base_forecast: Optional[float] = Field(default=None, description="Pure statistical route-specific ARIMA(0,1,1) level forecast (USD/tonne)")
+    operational_adjustment: Optional[float] = Field(default=0.0, description="Operational cost and risk adjustment (USD/tonne)")
+    expected_freight: Optional[float] = Field(default=None, description="Expected next-month freight rate (USD/tonne)")
     predicted_freight_usd_per_tonne: Optional[float] = Field(default=None, description="Forecasted level rate (USD/tonne)")
     forecast_change_usd_per_tonne: Optional[float] = Field(default=None, description="Forecast change in USD/tonne")
     forecast_change_percent: Optional[float] = Field(default=None, description="Forecast change in percent")
@@ -142,8 +155,26 @@ class FreightResponse(BaseModel):
         ..., description="Actionable chartering recommendation"
     )
     reason: str = Field(..., description="Human-readable explanation of the recommendation")
+    base_forecast: Optional[float] = Field(
+        default=None, description="Pure statistical route-specific ARIMA(0,1,1) level forecast (USD/tonne)"
+    )
+    operational_adjustment: Optional[float] = Field(
+        default=0.0, description="Operational cost and risk adjustment (USD/tonne)"
+    )
     predicted_freight_usd_per_tonne: Optional[float] = Field(
         default=None, description="Model forecast for next-month freight rate (USD/tonne)"
+    )
+    expected_freight: Optional[float] = Field(
+        default=None, description="Expected next-month freight rate (USD/tonne)"
+    )
+    forecast_low: Optional[float] = Field(
+        default=None, description="Empirical lower bound of forecast interval (USD/tonne)"
+    )
+    forecast_high: Optional[float] = Field(
+        default=None, description="Empirical upper bound of forecast interval (USD/tonne)"
+    )
+    model_validation_mae: Optional[float] = Field(
+        default=None, description="Empirical out-of-sample walk-forward MAE (USD/tonne)"
     )
     forecast_change_usd_per_tonne: Optional[float] = Field(
         default=None, description="Forecast delta in USD/tonne"
@@ -769,6 +800,14 @@ class VesselEvaluationItem(BaseModel):
     forecast_risk_level: Optional[str] = Field(
         None, description="Model v3 weather risk band ('LOW', 'MEDIUM', 'HIGH')"
     )
+    base_forecast: Optional[float] = Field(None, description="Base ARIMA time-series forecast rate")
+    operational_adjustment: Optional[float] = Field(None, description="Weather and market operational adjustment")
+    expected_freight: Optional[float] = Field(None, description="Expected operational freight rate (USD/t)")
+    forecast_low: Optional[float] = Field(None, description="Empirical forecast range lower bound (USD/t)")
+    forecast_high: Optional[float] = Field(None, description="Empirical forecast range upper bound (USD/t)")
+    model_validation_mae: Optional[float] = Field(None, description="Walk-forward validation MAE (USD/t)")
+    direction: Optional[str] = Field(None, description="Forecast direction: UP | DOWN | STABLE")
+    market_data_provenance: Optional[str] = Field(None, description="Market data source provenance")
     port_compatible: bool = Field(..., description="Physical draft and berth feasibility at discharge port")
     port_fit_label: Optional[str] = Field(None, description="Human-readable port draft feasibility summary")
     cargo_fit: bool = Field(..., description="Cargo volume compatibility with vessel deadweight")
@@ -817,6 +856,14 @@ class DecisionVesselSummary(BaseModel):
     predicted_freight_usd_per_tonne: Optional[float] = Field(None, description="Model v3 forecasted freight rate (USD/t)")
     estimated_freight_outlay_usd: Optional[float] = Field(None, description="Total estimated freight cost (rate * tonnes)")
     suitability_score: Optional[float] = Field(None, description="Suitability score on a 0-100 scale")
+    base_forecast: Optional[float] = Field(None, description="Base ARIMA time-series forecast rate")
+    operational_adjustment: Optional[float] = Field(None, description="Weather and market operational adjustment")
+    expected_freight: Optional[float] = Field(None, description="Expected operational freight rate (USD/t)")
+    forecast_low: Optional[float] = Field(None, description="Empirical forecast range lower bound (USD/t)")
+    forecast_high: Optional[float] = Field(None, description="Empirical forecast range upper bound (USD/t)")
+    model_validation_mae: Optional[float] = Field(None, description="Walk-forward validation MAE (USD/t)")
+    direction: Optional[str] = Field(None, description="Forecast direction: UP | DOWN | STABLE")
+    market_data_provenance: Optional[str] = Field(None, description="Market data source provenance")
     reasons: list[str] = Field(default_factory=list, description="Vessel suitability and feasibility bullets")
     evaluated_vessels: list[VesselEvaluationItem] = Field(
         default_factory=list, description="Comparative evaluations across vessel classes"
@@ -844,6 +891,16 @@ class DecisionLandedCostSummary(BaseModel):
     formula: str = Field(
         default="Landed Cost = Commodity FOB + Ocean Freight",
         description="Applied landed cost calculation formula",
+    )
+    exclusions: list[str] = Field(
+        default_factory=lambda: [
+            "Customs import duties (Basic Customs Duty / Cess)",
+            "Goods and Services Tax (GST / IGST)",
+            "Port handling charges (stevedoring / wharfage / pilotage)",
+            "Vessel demurrage and dispatch",
+            "Marine cargo transit insurance",
+        ],
+        description="Explicit list of cost categories excluded from baseline calculation",
     )
     provenance: dict[str, str] = Field(
         default_factory=dict, description="Source provenance for commodity and freight components"
@@ -876,6 +933,10 @@ class DecisionAnalysisResponse(BaseModel):
     vessel: DecisionVesselSummary = Field(..., description="Vessel suitability and freight forecast economics")
     landed_cost: DecisionLandedCostSummary = Field(
         ..., description="Delivered commodity acquisition cost economics (FOB + Freight)"
+    )
+    cargo_decision: Optional[str] = Field(
+        default=None,
+        description="Independent cargo procurement decision: BUY CARGO | MONITOR CARGO | WAIT TO BUY",
     )
     charter_decision: str = Field(
         ..., description="Freight timing recommendation: CHARTER NOW | WAIT TO CHARTER | MONITOR FREIGHT | NO SUITABLE VESSEL"

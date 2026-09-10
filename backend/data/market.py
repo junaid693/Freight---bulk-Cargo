@@ -18,7 +18,18 @@ instance of it to ``update_data.update_market_data(provider=...)``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional, Protocol
+
+
+class MarketProvenanceState(str, Enum):
+    """Explicit provenance state of market intelligence indicators."""
+
+    LIVE = "LIVE"
+    HISTORICAL_FALLBACK = "HISTORICAL_FALLBACK"
+    USER_PROVIDED = "USER_PROVIDED"
+    UNAVAILABLE = "UNAVAILABLE"
+
 
 # Canonical market series used by the forecasting model. Maps a series key
 # (which matches the model feature name) to its human label + unit.
@@ -36,6 +47,7 @@ class MarketQuote:
     value: float
     unit: str
     source: str
+    provenance_state: str = MarketProvenanceState.HISTORICAL_FALLBACK.value
 
 
 class MarketDataProvider(Protocol):

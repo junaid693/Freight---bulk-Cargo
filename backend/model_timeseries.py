@@ -71,6 +71,8 @@ class RouteARIMAProfile:
         observations_count: int = 22,
         aic: float = 0.0,
         bic: float = 0.0,
+        validation_mae: float = 1.1078,
+        validation_rmse: float = 1.7792,
     ):
         self.route_tuple = route_tuple
         self.order = order
@@ -86,15 +88,36 @@ class RouteARIMAProfile:
         self.observations_count = observations_count
         self.aic = aic
         self.bic = bic
+        self.validation_mae = validation_mae
+        self.validation_rmse = validation_rmse
 
-    def forecast_delta(self, current_freight: float) -> Tuple[float, float]:
-        """Compute expected freight delta and expected MA adjustment.
+    def forecast_delta(self, current_freight: float) -> Tuple[float, float, bool]:
+        """Compute expected freight delta and innovation shock.
 
         For ARIMA(0,1,1):
             Delta y_{t+1} = theta * epsilon_t
+        Handles dynamic inference state if current_freight differs from historical last_observed_freight.
         """
-        delta = float(self.theta * self.last_residual)
-        return delta, self.last_residual
+        y_last = float(self.last_observed_freight)
+        theta = float(self.theta)
+        eps_last = float(self.last_residual)
+        sigma = math.sqrt(max(0.01, float(self.sigma2)))
+
+        if abs(current_freight - y_last) < 0.01:
+            # Querying directly from historical sample end
+            eps = eps_last
+            is_dynamic = False
+        else:
+            # Dynamic state update from user-supplied spot quotation
+            # Surprise relative to the expected rate from the last known step
+            y_exp = y_last + theta * eps_last
+            raw_surprise = current_freight - y_exp
+            # Defensive 3-sigma bounding to guard against unphysical input typos
+            eps = float(np.clip(raw_surprise, -3.0 * sigma, 3.0 * sigma))
+            is_dynamic = True
+
+        delta = float(theta * eps_last)
+        return delta, eps, is_dynamic
 
 
 class NaviFreightTimeSeriesForecaster:
@@ -175,26 +198,25 @@ class NaviFreightTimeSeriesForecaster:
         profile = self.match_route(origin, destination, commodity, vessel_type)
 
         if profile is not None:
-            raw_delta, eps = profile.forecast_delta(current)
+            raw_delta, eps, is_dynamic = profile.forecast_delta(current)
             theta = profile.theta
             route_label = f"{profile.route_tuple[0]} -> {profile.route_tuple[1]} ({profile.route_tuple[2]} / {profile.route_tuple[3]})"
             h_min, h_max = profile.history_min, profile.history_max
             h_std = profile.history_std
             h_mean = profile.history_mean
+            route_mae = getattr(profile, "validation_mae", 1.1078)
         else:
             raw_delta = self.global_mean_delta
             eps = 0.0
             theta = 0.0
+            is_dynamic = False
             route_label = "Global Fallback Route"
             h_min, h_max = 5.0, 30.0
             h_std = 2.0
             h_mean = 12.0
+            route_mae = 1.1078
 
-        # Market indicator micro-adjustments (lagged effects from exogenous signals)
-        # Standardized gentle adjustment for BDI and bunker movements if supplied
-        bdi_val = float(row.get("bdi", 1500.0) or 1500.0)
-        vlsfo_val = float(row.get("vlsfo_usd_per_tonne", 600.0) or 600.0)
-        # Market indicator adjustments (lagged effects from exogenous signals)
+        # Market indicator inputs
         bdi_val = float(row.get("bdi", 1500.0) or 1500.0)
         vlsfo_val = float(row.get("vlsfo_usd_per_tonne", 620.0) or 620.0)
         coal_val = float(row.get("coal_price_usd_per_mt", 124.0) or 124.0)
@@ -209,7 +231,7 @@ class NaviFreightTimeSeriesForecaster:
         excess_dev = float(max(0.0, dev - 0.3 * h_std)) if dev > 0 else 0.0
         mean_rev = float(-0.33 * excess_dev)
 
-        # Market & weather signal contributions
+        # Operational decision-layer adjustments (bunker pass-through, BDI macro sensitivity, weather delay)
         bdi_effect = float(np.clip((bdi_val - 1500.0) * 0.0003, -0.60, 0.60))
         vlsfo_effect = float(np.clip((vlsfo_val - 600.0) * 0.015, -1.00, 1.00))
         coal_effect = float(np.clip((coal_val - 124.0) * 0.002, -0.30, 0.30)) if "coal" in commodity.lower() else 0.0
@@ -219,10 +241,14 @@ class NaviFreightTimeSeriesForecaster:
         wind_effect = float(np.clip((wind_val - 25.0) * 0.002, -0.05, 0.10)) if wind_val > 0 else 0.0
         wave_effect = float(np.clip((wave_val - 1.5) * 0.02, -0.05, 0.10)) if wave_val > 0 else 0.0
 
-        curr_contrib = float(raw_delta + mean_rev)
+        # --- 1. Pure Statistical Base Forecast: Route-Specific ARIMA(0,1,1) ---
+        max_allowed_delta = 4.0
+        bounded_arima_delta = float(np.clip(raw_delta, -max_allowed_delta, max_allowed_delta))
+        base_forecast = max(1.0, round(current + bounded_arima_delta, 2))
 
-        model_delta = (
-            curr_contrib
+        # --- 2. Operational Decision-Layer Adjustment ---
+        op_adjustment_raw = (
+            mean_rev
             + bdi_effect
             + vlsfo_effect
             + coal_effect
@@ -232,26 +258,34 @@ class NaviFreightTimeSeriesForecaster:
             + wind_effect
             + wave_effect
         )
+        operational_adjustment = round(op_adjustment_raw, 2)
 
-        # Defensive residual guardrail [-4.0, +4.0] USD/tonne (training-derived)
-        max_allowed_delta = 4.0
+        # --- 3. Combined Expected Freight ---
+        model_delta = raw_delta + mean_rev + bdi_effect + vlsfo_effect + coal_effect + iron_effect + weather_effect + cyclone_effect + wind_effect + wave_effect
         bounded_delta = float(np.clip(model_delta, -max_allowed_delta, max_allowed_delta))
         sanity_check_applied = bool(abs(model_delta) > max_allowed_delta)
 
         # Enforce physical floor (minimum 1.0 USD/tonne)
-        predicted = max(1.0, current + bounded_delta)
+        predicted = max(1.0, round(current + bounded_delta, 2))
+        expected_freight = predicted
         floor_applied = bool((current + bounded_delta) < 1.0)
 
-        change_usd = round(predicted - current, 2)
+        change_usd = round(expected_freight - current, 2)
         change_pct = round((change_usd / current) * 100.0, 2) if current > 0 else 0.0
 
         direction = "UP" if change_pct >= 5.0 else ("DOWN" if change_pct <= -5.0 else "STABLE")
 
-        # Full 13-feature additive explainability drivers
+        # Empirical uncertainty bounds based on out-of-sample walk-forward MAE (Step 6)
+        forecast_low = max(1.0, round(expected_freight - route_mae, 2))
+        forecast_high = round(expected_freight + route_mae, 2)
+        model_validation_mae = round(route_mae, 4)
+
+        # Transparent explainability drivers matching schema and test contract
+        curr_contrib = float(raw_delta + mean_rev)
         drivers = [
             {
                 "feature": "current_freight_usd_per_tonne",
-                "feature_label": "Current Base Freight (Mean Reversion)",
+                "feature_label": "Base Freight (ARIMA Shock + Mean Reversion)",
                 "value": round(current, 2),
                 "unit": "USD/tonne",
                 "coefficient": round(theta, 4),
@@ -261,20 +295,20 @@ class NaviFreightTimeSeriesForecaster:
             },
             {
                 "feature": "bdi",
-                "feature_label": "Baltic Dry Index (BDI)",
+                "feature_label": "Baltic Dry Index (BDI Macro Sensitivity)",
                 "value": round(bdi_val, 1),
                 "unit": "points",
-                "coefficient": 0.0005,
+                "coefficient": 0.0003,
                 "contribution_usd_per_tonne": round(bdi_effect, 4),
                 "effect": "positive" if bdi_effect > 0.001 else ("negative" if bdi_effect < -0.001 else "neutral"),
                 "source": "model",
             },
             {
                 "feature": "vlsfo_usd_per_tonne",
-                "feature_label": "VLSFO Bunker Price",
+                "feature_label": "VLSFO Bunker Pass-Through",
                 "value": round(vlsfo_val, 1),
                 "unit": "USD/tonne",
-                "coefficient": 0.001,
+                "coefficient": 0.015,
                 "contribution_usd_per_tonne": round(vlsfo_effect, 4),
                 "effect": "positive" if vlsfo_effect > 0.001 else ("negative" if vlsfo_effect < -0.001 else "neutral"),
                 "source": "model",
@@ -284,7 +318,7 @@ class NaviFreightTimeSeriesForecaster:
                 "feature_label": "Coal Benchmark Price",
                 "value": round(coal_val, 1),
                 "unit": "USD/MT",
-                "coefficient": 0.003,
+                "coefficient": 0.002 if "coal" in commodity.lower() else 0.0,
                 "contribution_usd_per_tonne": round(coal_effect, 4),
                 "effect": "positive" if coal_effect > 0.001 else ("negative" if coal_effect < -0.001 else "neutral"),
                 "source": "model",
@@ -294,7 +328,7 @@ class NaviFreightTimeSeriesForecaster:
                 "feature_label": "Iron Ore Benchmark Price",
                 "value": round(iron_val, 1),
                 "unit": "USD/dmt",
-                "coefficient": 0.003,
+                "coefficient": 0.002 if "iron" in commodity.lower() else 0.0,
                 "contribution_usd_per_tonne": round(iron_effect, 4),
                 "effect": "positive" if iron_effect > 0.001 else ("negative" if iron_effect < -0.001 else "neutral"),
                 "source": "model",
@@ -304,9 +338,9 @@ class NaviFreightTimeSeriesForecaster:
                 "feature_label": "Weather Delay Estimate",
                 "value": round(delay_days, 1),
                 "unit": "days",
-                "coefficient": 0.12,
+                "coefficient": 0.08,
                 "contribution_usd_per_tonne": round(weather_effect, 4),
-                "effect": "positive" if weather_effect > 0.001 else "neutral",
+                "effect": "positive" if weather_effect > 0.001 else ("negative" if weather_effect < -0.001 else "neutral"),
                 "source": "model",
             },
             {
@@ -314,9 +348,9 @@ class NaviFreightTimeSeriesForecaster:
                 "feature_label": "Cyclone Risk Score",
                 "value": round(cyclone_val, 1),
                 "unit": "0-5",
-                "coefficient": 0.05,
+                "coefficient": 0.06,
                 "contribution_usd_per_tonne": round(cyclone_effect, 4),
-                "effect": "positive" if cyclone_effect > 0.001 else "neutral",
+                "effect": "positive" if cyclone_effect > 0.001 else ("negative" if cyclone_effect < -0.001 else "neutral"),
                 "source": "model",
             },
             {
@@ -324,9 +358,9 @@ class NaviFreightTimeSeriesForecaster:
                 "feature_label": "Wind Speed",
                 "value": round(wind_val, 1),
                 "unit": "km/h",
-                "coefficient": 0.002,
+                "coefficient": 0.002 if wind_val > 0 else 0.0,
                 "contribution_usd_per_tonne": round(wind_effect, 4),
-                "effect": "positive" if wind_effect > 0.001 else "neutral",
+                "effect": "positive" if wind_effect > 0.001 else ("negative" if wind_effect < -0.001 else "neutral"),
                 "source": "model",
             },
             {
@@ -334,9 +368,9 @@ class NaviFreightTimeSeriesForecaster:
                 "feature_label": "Significant Wave Height",
                 "value": round(wave_val, 1),
                 "unit": "m",
-                "coefficient": 0.02,
+                "coefficient": 0.02 if wave_val > 0 else 0.0,
                 "contribution_usd_per_tonne": round(wave_effect, 4),
-                "effect": "positive" if wave_effect > 0.001 else "neutral",
+                "effect": "positive" if wave_effect > 0.001 else ("negative" if wave_effect < -0.001 else "neutral"),
                 "source": "model",
             },
             {
@@ -383,21 +417,32 @@ class NaviFreightTimeSeriesForecaster:
 
         # Natural language summary
         dir_word = "rise" if direction == "UP" else ("drop" if direction == "DOWN" else "remain stable")
+        state_str = "dynamic spot update" if is_dynamic else "historical baseline shock"
         summary = (
-            f"Freight is projected to {dir_word} from ${current:.2f}/t to ${predicted:.2f}/t ({change_pct:+.2f}%) "
-            f"for {route_label} based on route-specific ARIMA(0,1,1) historical shock persistence "
-            f"and current market indicators."
+            f"Freight is projected to {dir_word} from ${current:.2f}/t to ${expected_freight:.2f}/t ({change_pct:+.2f}%) "
+            f"for {route_label}. Base statistical forecast: ${base_forecast:.2f}/t (ARIMA(0,1,1) theta: {theta:+.4f}, "
+            f"shock: {eps:+.2f} USD/t, {state_str}). Operational adjustment: ${operational_adjustment:+.2f}/t. "
+            f"Expected empirical range: [${forecast_low:.2f}, ${forecast_high:.2f}]/t (Validation MAE: {route_mae:.4f} USD/t)."
         )
 
         anchor = {
             "current_freight_usd_per_tonne": round(current, 2),
-            "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
-            "predicted_freight_usd_per_tonne": round(predicted, 2),
+            "base_forecast": base_forecast,
+            "operational_adjustment": operational_adjustment,
+            "predicted_next_month_freight_usd_per_tonne": expected_freight,
+            "predicted_freight_usd_per_tonne": expected_freight,
+            "expected_freight": expected_freight,
+            "forecast_low": forecast_low,
+            "forecast_high": forecast_high,
+            "model_validation_mae": model_validation_mae,
             "raw_predicted_delta_usd_per_tonne": round(model_delta, 4),
             "bounded_delta_usd_per_tonne": round(bounded_delta, 4),
+            "base_arima_delta_usd_per_tonne": round(raw_delta, 4),
             "forecast_change_usd_per_tonne": change_usd,
             "forecast_change_percent": change_pct,
             "direction": direction,
+            "dynamic_state_updated": is_dynamic,
+            "innovation_residual": round(eps, 4),
             "model_intercept": 0.0,
             "residual_guardrail_applied": sanity_check_applied,
             "physical_floor_applied": floor_applied,
@@ -407,8 +452,14 @@ class NaviFreightTimeSeriesForecaster:
         }
 
         return {
-            "predicted_next_month_freight_usd_per_tonne": round(predicted, 2),
-            "predicted_freight_usd_per_tonne": round(predicted, 2),
+            "base_forecast": base_forecast,
+            "operational_adjustment": operational_adjustment,
+            "predicted_next_month_freight_usd_per_tonne": expected_freight,
+            "predicted_freight_usd_per_tonne": expected_freight,
+            "expected_freight": expected_freight,
+            "forecast_low": forecast_low,
+            "forecast_high": forecast_high,
+            "model_validation_mae": model_validation_mae,
             "current_freight_usd_per_tonne": round(current, 2),
             "forecast_change_usd_per_tonne": change_usd,
             "forecast_change_percent": change_pct,

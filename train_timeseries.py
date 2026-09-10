@@ -74,6 +74,8 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
 
     models_to_test = [
         ("Persistence Baseline", "pers", None, None),
+        ("Moving Average (3-month)", "ma3", None, None),
+        ("Moving Average (2-month)", "ma2", None, None),
         ("Current Ridge Model v3", "ridge", None, None),
         ("ARIMA(0,1,1)", "arima", (0, 1, 1), None),
         ("ARIMA(1,1,0)", "arima", (1, 1, 0), None),
@@ -86,6 +88,7 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
     ]
 
     metrics = {}
+    route_arima_metrics = {}
     print(f"\n{'Model':30} | {'Out-of-Sample MAE':18} | {'RMSE':10} | {'Dir Acc (%)':12} | Status")
     print("-" * 80)
 
@@ -94,6 +97,8 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
         all_actuals = []
         all_pers = []
         fail_count = 0
+        route_p = {r: [] for r in CANONICAL_ROUTES}
+        route_a = {r: [] for r in CANONICAL_ROUTES}
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -120,6 +125,34 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
                     all_actuals.extend(te_df[TARGET].values)
                     all_pers.extend(te_df["current_freight_usd_per_tonne"].values)
 
+                elif mtype == "ma3":
+                    for (o, d, c, v) in CANONICAL_ROUTES:
+                        route_df = df[
+                            (df["origin"] == o)
+                            & (df["destination"] == d)
+                            & (df["commodity"] == c)
+                            & (df["vessel_type"] == v)
+                        ].sort_values("date_dt").reset_index(drop=True)
+                        y_hist = route_df["current_freight_usd_per_tonne"].iloc[:t].values
+                        pred = float(np.mean(y_hist[-3:]))
+                        all_preds.append(pred)
+                        all_actuals.append(route_df[TARGET].iloc[t - 1])
+                        all_pers.append(route_df["current_freight_usd_per_tonne"].iloc[t - 1])
+
+                elif mtype == "ma2":
+                    for (o, d, c, v) in CANONICAL_ROUTES:
+                        route_df = df[
+                            (df["origin"] == o)
+                            & (df["destination"] == d)
+                            & (df["commodity"] == c)
+                            & (df["vessel_type"] == v)
+                        ].sort_values("date_dt").reset_index(drop=True)
+                        y_hist = route_df["current_freight_usd_per_tonne"].iloc[:t].values
+                        pred = float(np.mean(y_hist[-2:]))
+                        all_preds.append(pred)
+                        all_actuals.append(route_df[TARGET].iloc[t - 1])
+                        all_pers.append(route_df["current_freight_usd_per_tonne"].iloc[t - 1])
+
                 else:
                     # Route-specific time-series models
                     for (o, d, c, v) in CANONICAL_ROUTES:
@@ -132,7 +165,7 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
 
                         # Row at time t
                         y_train = route_df["current_freight_usd_per_tonne"].iloc[:t].values
-                        y_actual = route_df[TARGET].iloc[t - 1]  # or route_df["current_freight_usd_per_tonne"].iloc[t]
+                        y_actual = route_df[TARGET].iloc[t - 1]
                         pers_val = route_df["current_freight_usd_per_tonne"].iloc[t - 1]
 
                         if mtype == "arimax":
@@ -173,6 +206,9 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
                         all_preds.append(pred)
                         all_actuals.append(y_actual)
                         all_pers.append(pers_val)
+                        if name == "ARIMA(0,1,1)":
+                            route_p[(o, d, c, v)].append(pred)
+                            route_a[(o, d, c, v)].append(y_actual)
 
         p_arr = np.array(all_preds)
         a_arr = np.array(all_actuals)
@@ -187,7 +223,9 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
         else:
             dir_acc = float(np.mean(np.sign(a_arr - pe_arr) == np.sign(p_arr - pe_arr)) * 100.0)
             dir_str = f"{dir_acc:11.1f}%"
-            if mtype == "ridge":
+            if mtype in ("ma3", "ma2"):
+                status = "Evaluated Baseline"
+            elif mtype == "ridge":
                 status = "Underperforms Persistence"
             elif fail_count > 0:
                 status = f"{fail_count} convergence failures"
@@ -199,11 +237,17 @@ def run_chronological_evaluation(df: pd.DataFrame) -> Dict[str, Dict[str, float]
         metrics[name] = {"mae": mae, "rmse": rmse, "dir_acc": dir_acc}
         print(f"{name:30} | {mae:18.4f} | {rmse:10.4f} | {dir_str:12} | {status}")
 
-    return metrics
+        if name == "ARIMA(0,1,1)":
+            for r_key in CANONICAL_ROUTES:
+                r_mae = mean_absolute_error(route_a[r_key], route_p[r_key])
+                r_rmse = np.sqrt(mean_squared_error(route_a[r_key], route_p[r_key]))
+                route_arima_metrics[r_key] = {"mae": r_mae, "rmse": r_rmse}
+
+    return metrics, route_arima_metrics
 
 
 
-def train_and_export_production_model(df: pd.DataFrame) -> NaviFreightTimeSeriesForecaster:
+def train_and_export_production_model(df: pd.DataFrame, route_arima_metrics: dict | None = None) -> NaviFreightTimeSeriesForecaster:
     """Fit final route-specific ARIMA(0,1,1) models on full 110 observations and persist artifact."""
     print("\n" + "=" * 70)
     print("TRAINING PRODUCTION TIME-SERIES FORECASTER ON ALL 110 OBSERVATIONS")
@@ -237,6 +281,7 @@ def train_and_export_production_model(df: pd.DataFrame) -> NaviFreightTimeSeries
             theta = float(res.params[0])
             sigma2 = float(res.params[1]) if len(res.params) > 1 else 1.0
             last_res = float(res.resid[-1]) if len(res.resid) > 0 else 0.0
+            r_metrics = (route_arima_metrics or {}).get((o, d, c, v), {"mae": 1.1078, "rmse": 1.7792})
 
             profile = RouteARIMAProfile(
                 route_tuple=(o, d, c, v),
@@ -253,10 +298,12 @@ def train_and_export_production_model(df: pd.DataFrame) -> NaviFreightTimeSeries
                 observations_count=len(series),
                 aic=float(res.aic),
                 bic=float(res.bic),
+                validation_mae=r_metrics["mae"],
+                validation_rmse=r_metrics["rmse"],
             )
             forecaster.add_route_profile(profile)
 
-            print(f"  Trained Route: {o:22} | {v:9} | N={len(series)} | theta={theta:+.4f} | AIC={res.aic:.1f} | LastFreight=${series[-1]:.2f}")
+            print(f"  Trained Route: {o:22} | {v:9} | N={len(series)} | theta={theta:+.4f} | MAE={r_metrics['mae']:.4f} | LastFreight=${series[-1]:.2f}")
 
     # Persist to disk
     joblib.dump(forecaster, MODEL_TIMESERIES_PATH)
@@ -288,8 +335,12 @@ def train_and_export_production_model(df: pd.DataFrame) -> NaviFreightTimeSeries
         delta = pred_dict["forecast_change_usd_per_tonne"]
         pct = pred_dict["forecast_change_percent"]
         d = pred_dict["direction"]
-        print(f"  {c['origin']:22} | {c['vessel_type']:9} -> Current: ${c['current_freight_usd_per_tonne']:5.1f} | Pred: ${pred_val:5.2f} (Delta: {delta:+5.2f}, {pct:+5.2f}%) -> {d}")
+        low = pred_dict["forecast_low"]
+        high = pred_dict["forecast_high"]
+        mae = pred_dict["model_validation_mae"]
+        print(f"  {c['origin']:22} | {c['vessel_type']:9} -> Base: ${c['current_freight_usd_per_tonne']:5.1f} | Pred: ${pred_val:5.2f} (Delta: {delta:+5.2f}, {pct:+5.2f}%) | Range: [${low:.2f}, ${high:.2f}] (MAE: {mae:.2f}) -> {d}")
         assert 5.0 <= pred_val <= 30.0, f"Unrealistic prediction {pred_val}"
+        assert low <= pred_val <= high, f"Invalid interval [{low}, {high}] for {pred_val}"
 
     # Verify existing models untouched
     print("\n--- Immutability Verification ---")
@@ -313,8 +364,8 @@ def main():
     df["date_dt"] = pd.to_datetime(df["date"])
     print(f"Loaded dataset: {DATA_PATH.name} ({len(df)} rows, 0 missing)")
 
-    metrics = run_chronological_evaluation(df)
-    train_and_export_production_model(df)
+    metrics, route_metrics = run_chronological_evaluation(df)
+    train_and_export_production_model(df, route_arima_metrics=route_metrics)
 
 
 if __name__ == "__main__":

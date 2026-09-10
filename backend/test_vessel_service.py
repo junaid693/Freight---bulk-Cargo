@@ -248,8 +248,7 @@ class TestVesselService(unittest.TestCase):
     def test_arbitrary_cargo_volumes_accepted_and_evaluated(self):
         """Verify arbitrary non-5000 increment cargo volumes (10k, 15k, 18k, 18.5k, 22.5k, 37.25k, 51.7k, 75k, 100k, 150k) evaluate cleanly."""
         test_cases = [
-            (10000, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
-            (15000, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
+            (15750, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
             (18000, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
             (18500, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
             (22500, "Taboneo", "Thermal Coal", "East Coast India", "Handysize"),
@@ -272,6 +271,24 @@ class TestVesselService(unittest.TestCase):
                 winner = next(v for v in res["evaluated_vessels"] if v["vessel_type"] == expected_vessel)
                 self.assertTrue(winner["eligible"])
                 self.assertTrue(winner["cargo_fit"])
+
+    def test_underutilized_cargo_rejected_below_45_percent(self):
+        """Verify cargo volumes below 45% minimum economic threshold (<15,750 mt for Handysize) are rejected."""
+        sub_45_volumes = [10000, 12345, 15000, 15749]
+        for cargo in sub_45_volumes:
+            with self.subTest(cargo=cargo):
+                res = optimize_vessel_chartering(
+                    origin="Taboneo",
+                    destination="East Coast India",
+                    commodity="Thermal Coal",
+                    cargo_tonnes=cargo,
+                )
+                self.assertEqual(res["status"], "NO_SUITABLE_VESSEL")
+                self.assertIsNone(res["recommended_vessel"])
+                for ev in res["evaluated_vessels"]:
+                    self.assertFalse(ev["cargo_fit"])
+                    self.assertFalse(ev["eligible"])
+                    self.assertEqual(ev["cargo_fit_label"], "Excessive unused capacity")
 
     # -------------------------------------------------------------------------
     # 6. Trade Lane / Corridor Support

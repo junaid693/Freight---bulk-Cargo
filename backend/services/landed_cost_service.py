@@ -77,9 +77,21 @@ def calculate_landed_cost(
                 f"for {float(cargo_tonnes):,.0f} mt."
             )
 
+    exclusions = [
+        "Customs import duties (Basic Customs Duty / Cess)",
+        "Goods and Services Tax (GST / IGST)",
+        "Port handling charges (stevedoring / wharfage / pilotage)",
+        "Vessel demurrage and dispatch",
+        "Marine cargo transit insurance",
+    ]
+    reasons.append(
+        "Excluded costs: Customs duties, GST, port handling charges, demurrage, and marine insurance "
+        "are excluded from this baseline landed cost calculation as they vary by importer tariff classification and terminal operator."
+    )
+
     provenance = {
         "commodity_source": "World Bank Pink Sheet (Monthly Commodity Price Data)",
-        "freight_source": "Model V3 Bounded Freight Forecast",
+        "freight_source": "Model V3 / Route-Specific ARIMA Freight Forecast",
         "formula": "Landed Cost = Commodity FOB + Ocean Freight",
     }
 
@@ -94,6 +106,7 @@ def calculate_landed_cost(
         "landed_cost_unit": landed_unit,
         "estimated_total_landed_outlay_usd": estimated_total_landed_outlay_usd,
         "formula": "Landed Cost = Commodity FOB + Ocean Freight",
+        "exclusions": exclusions,
         "provenance": provenance,
         "reasons": reasons,
     }

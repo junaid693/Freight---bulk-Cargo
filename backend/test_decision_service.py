@@ -489,8 +489,13 @@ class TestDecisionOrchestrationService(unittest.TestCase):
                 data = resp.json()
                 # Verify exact value is preserved without rounding
                 self.assertEqual(data["cargo_tonnes"], float(vol))
-                self.assertEqual(data["vessel"]["status"], "OPTIMIZED")
-                self.assertIsNotNone(data["vessel"]["recommended_vessel"])
+                # Capacity utilization threshold is strictly 45% (15,750 mt for Handysize 35k DWT)
+                if vol < 15750:
+                    self.assertEqual(data["vessel"]["status"], "NO_SUITABLE_VESSEL")
+                    self.assertIsNone(data["vessel"]["recommended_vessel"])
+                else:
+                    self.assertEqual(data["vessel"]["status"], "OPTIMIZED")
+                    self.assertIsNotNone(data["vessel"]["recommended_vessel"])
 
 
 if __name__ == "__main__":
