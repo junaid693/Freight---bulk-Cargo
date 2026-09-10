@@ -1,412 +1,221 @@
 /* ==========================================================================
-   NaviFreight — Stitch Design System Fidelity
-   Authoritative Reference: Stitch Project 12694042747017210949
-   Visual Style: High-fidelity SaaS Logistics & Decision Platform
+   NaviFreight - Stitch Design System Core Styles
+   Project: 12694042747017210949 (Google Stitch Visual Source of Truth)
+   Enterprise Freight & Bulk Cargo Decision Workstation
    ========================================================================== */
 
 :root {
-  /* Page Background & Surfaces */
-  --bg-app: #F8FAFC;
-  --bg-surface: #FFFFFF;
-  --bg-subtle: #F1F5F9;
-  --bg-muted: #E2E8F0;
+  /* Surface Tokens */
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f8fafc;
+  --surface-container: #f1f5f9;
+  --surface-container-high: #e2e8f0;
+  --surface-container-highest: #cbd5e1;
 
-  --border-subtle: #E2E8F0;
-  --border-card: rgba(226, 232, 240, 0.85);
-  --border-strong: #CBD5E1;
+  /* Brand & Status Tokens */
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --primary-container: #e0f2fe;
+  --on-primary: #ffffff;
+  --on-primary-container: #0369a1;
 
-  --primary: #2563EB;
-  --primary-hover: #1D4ED8;
-  --primary-light: #EFF6FF;
-  --primary-border: #BFDBFE;
+  --secondary: #0d9488;
+  --secondary-container: #ccfbf1;
+  --on-secondary-container: #115e59;
 
-  --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-muted: #64748B;
-  --text-disabled: #94A3B8;
+  --tertiary: #4f46e5;
+  --tertiary-container: #e0e7ff;
+  --on-tertiary-container: #3730a3;
 
-  /* Cargo Theme (Mint / Emerald) */
-  --cargo-grad: linear-gradient(145deg, #F3FCF7 0%, #E8F9EE 50%, #D8F5E4 100%);
-  --cargo-border: rgba(52, 211, 153, 0.35);
-  --cargo-text: #064E3B;
-  --cargo-accent: #059669;
+  --error: #e11d48;
+  --error-container: #ffe4e6;
+  --on-error: #ffffff;
 
-  /* Freight Theme (Warm Amber / Peach) */
-  --freight-grad: linear-gradient(145deg, #FFFDF7 0%, #FEF8EE 50%, #FEEDD8 100%);
-  --freight-border: rgba(245, 158, 11, 0.35);
-  --freight-text: #78350F;
-  --freight-accent: #D97706;
+  --warning: #d97706;
+  --warning-container: #fef3c7;
+  --on-warning-container: #92400e;
 
-  /* Landed Cost Theme (Soft Blue) */
-  --landed-grad: linear-gradient(145deg, #F6FAFF 0%, #EDF5FF 50%, #DBEAFE 100%);
-  --landed-border: rgba(59, 130, 246, 0.3);
-  --landed-text: #1E3A8A;
-  --landed-accent: #2563EB;
+  --on-surface: #0f172a;
+  --on-surface-variant: #64748b;
+  --outline: #94a3b8;
+  --outline-variant: #cbd5e1;
 
-  /* Dark Hero Card */
-  --dark-hero-grad: linear-gradient(160deg, #131722 0%, #0D1017 100%);
-  --dark-hero-border: rgba(255, 255, 255, 0.08);
+  /* High-Fidelity Soft Pastel Gradients */
+  --cargo-grad: linear-gradient(135deg, rgba(236, 253, 245, 0.95) 0%, rgba(209, 250, 229, 0.65) 100%);
+  --cargo-border: rgba(167, 243, 208, 0.8);
+  
+  --freight-grad: linear-gradient(135deg, rgba(255, 251, 235, 0.95) 0%, rgba(254, 243, 199, 0.65) 100%);
+  --freight-border: rgba(253, 230, 138, 0.8);
 
-  /* Dark Inner Panels */
-  --inner-cargo-panel: linear-gradient(150deg, rgba(28, 33, 44, 0.95) 0%, rgba(42, 34, 18, 0.85) 100%);
-  --inner-cargo-border: rgba(245, 158, 11, 0.25);
-  --inner-freight-panel: linear-gradient(150deg, rgba(28, 33, 44, 0.95) 0%, rgba(18, 42, 28, 0.85) 100%);
-  --inner-freight-border: rgba(16, 185, 129, 0.25);
+  --landed-grad: linear-gradient(135deg, rgba(240, 249, 255, 0.95) 0%, rgba(224, 242, 254, 0.65) 100%);
+  --landed-border: rgba(186, 230, 253, 0.8);
 
-  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  --hero-dark-grad: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --hero-cargo-subcard: linear-gradient(145deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%);
+  --hero-freight-subcard: linear-gradient(145deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%);
 
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
-
-  --shadow-soft: 0 4px 14px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
-  --shadow-card: 0 4px 18px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
-  --shadow-hero: 0 20px 30px -10px rgba(0, 0, 0, 0.35), 0 10px 15px -5px rgba(0, 0, 0, 0.2);
+  /* Shadows */
+  --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --shadow-elevated: 0 12px 32px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  --shadow-hero: 0 20px 40px -8px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(51, 65, 85, 0.5);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
+/* Base Document Styles */
 body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-app);
-  color: var(--text-primary);
-  line-height: 1.5;
-  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--on-surface);
+  background-color: #f8fafc;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Tabular Numerals for Financial, Freight, and Telemetry Data */
-.tabular-nums, .font-mono, td, th {
-  font-variant-numeric: tabular-nums lining-nums;
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
 }
 
-/* Enterprise Card Container */
-.saas-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-xl);
+/* Navigation Tabs */
+.nav-tab-btn {
+  transition: all 0.15s ease-in-out;
+}
+.nav-tab-btn.active {
+  background-color: #ffffff;
+  color: var(--on-surface);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  font-weight: 600;
+}
+
+/* Stitch Pastel Metric Cards */
+.card-pastel-cargo {
+  background: var(--cargo-grad);
+  border: 1px solid var(--cargo-border);
+  box-shadow: var(--shadow-card);
+}
+.card-pastel-freight {
+  background: var(--freight-grad);
+  border: 1px solid var(--freight-border);
+  box-shadow: var(--shadow-card);
+}
+.card-pastel-landed {
+  background: var(--landed-grad);
+  border: 1px solid var(--landed-border);
   box-shadow: var(--shadow-card);
 }
 
-/* 3 Stitch Pastel Metric Cards */
-.card-metric-cargo {
-  background: var(--cargo-grad);
-  border: 1px solid var(--cargo-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-soft);
-}
-
-.card-metric-freight {
-  background: var(--freight-grad);
-  border: 1px solid var(--freight-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-soft);
-}
-
-.card-metric-landed {
-  background: var(--landed-grad);
-  border: 1px solid var(--landed-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-soft);
-}
-
-/* Dark Hero Card */
+/* Dark Hero Decision Intelligence Card */
 .hero-decision-card {
-  background: var(--dark-hero-grad);
-  border: 1px solid var(--dark-hero-border);
+  background: var(--hero-dark-grad);
   box-shadow: var(--shadow-hero);
-  border-radius: var(--radius-2xl);
+  border: 1px solid rgba(51, 65, 85, 0.6);
 }
 
-.inner-decision-cargo {
-  background: var(--inner-cargo-panel);
-  border: 1px solid var(--inner-cargo-border);
-  border-radius: var(--radius-xl);
-}
-
-.inner-decision-freight {
-  background: var(--inner-freight-panel);
-  border: 1px solid var(--inner-freight-border);
-  border-radius: var(--radius-xl);
-}
-
-/* 3-Column Decision Rationale Cards */
-.why-col-cargo {
-  background: linear-gradient(150deg, #FFFFFF 0%, #F3FCF7 100%);
-  border: 1px solid rgba(52, 211, 153, 0.25);
-  border-radius: var(--radius-lg);
-}
-
-.why-col-freight {
-  background: linear-gradient(150deg, #FFFFFF 0%, #FFFDF5 100%);
+.hero-cargo-card {
+  background: var(--hero-cargo-subcard);
   border: 1px solid rgba(245, 158, 11, 0.25);
-  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-.why-col-vessel {
-  background: linear-gradient(150deg, #FFFFFF 0%, #F5F9FF 100%);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: var(--radius-lg);
+.hero-freight-card {
+  background: var(--hero-freight-subcard);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* Top Navigation Tabs */
-.tab-btn {
-  padding: 0.625rem 1.25rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  transition: all 0.15s ease-in-out;
-  cursor: pointer;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.tab-btn:hover {
-  color: var(--text-primary);
-  background-color: var(--bg-subtle);
-}
-
-.tab-btn.active {
-  color: var(--primary);
-  background-color: var(--bg-surface);
-  border-color: var(--border-subtle);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  font-weight: 600;
-}
-
-/* Semantic Badges & Translucency */
+/* Badges & Status Pills */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 9999px;
-  border: 1px solid transparent;
-  text-transform: uppercase;
+  font-size: 0.725rem;
+  font-weight: 600;
   letter-spacing: 0.025em;
+  text-transform: uppercase;
 }
 
 .badge-success {
   background-color: rgba(16, 185, 129, 0.15);
   color: #047857;
-  border-color: rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .badge-warning {
   background-color: rgba(245, 158, 11, 0.15);
-  color: #B45309;
-  border-color: rgba(245, 158, 11, 0.35);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .badge-danger {
-  background-color: rgba(244, 63, 94, 0.15);
-  color: #BE123C;
-  border-color: rgba(244, 63, 94, 0.35);
+  background-color: rgba(225, 29, 72, 0.15);
+  color: #be123c;
+  border: 1px solid rgba(225, 29, 72, 0.3);
 }
 
 .badge-primary {
-  background-color: rgba(37, 99, 235, 0.15);
-  color: #1D4ED8;
-  border-color: rgba(37, 99, 235, 0.35);
+  background-color: rgba(2, 132, 199, 0.15);
+  color: #0369a1;
+  border: 1px solid rgba(2, 132, 199, 0.3);
 }
 
 .badge-neutral {
-  background-color: var(--bg-subtle);
-  color: var(--text-secondary);
-  border-color: var(--border-subtle);
+  background-color: rgba(148, 163, 184, 0.15);
+  color: #475569;
+  border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
-/* Translucent Dark Badges for Hero Card */
-.badge-hero-amber {
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #FCD34D;
-}
-
-.badge-hero-emerald {
-  background: rgba(16, 185, 129, 0.18);
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  color: #6EE7B7;
-}
-
-.badge-hero-rose {
-  background: rgba(244, 63, 94, 0.18);
-  border: 1px solid rgba(244, 63, 94, 0.4);
-  color: #FDA4AF;
-}
-
-/* Form Controls */
-.form-input, .form-select {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.form-input:focus, .form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-/* Primary Button */
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #FFFFFF;
-  background-color: var(--primary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-}
-
-.btn-primary:active {
-  transform: translateY(1px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Scenario Chip Selector */
+/* Scenario Chips */
 .scenario-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.15s ease-in-out;
+  user-select: none;
 }
-
 .scenario-chip:hover {
-  background-color: var(--primary-light);
-  border-color: var(--primary-border);
+  border-color: var(--primary);
   color: var(--primary);
 }
-
 .scenario-chip.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: #FFFFFF;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
-}
-
-/* Table Styles */
-.saas-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.saas-table th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.75rem;
+  background-color: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  background-color: var(--bg-subtle);
-  border-bottom: 1px solid var(--border-subtle);
 }
 
-.saas-table td {
-  padding: 0.875rem 1rem;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-subtle);
+/* Vessel Comparison Table Rows */
+.row-recommended {
+  background: linear-gradient(90deg, rgba(224, 242, 254, 0.7) 0%, rgba(240, 249, 255, 0.9) 100%) !important;
+  border-left: 4px solid #0284c7 !important;
+}
+.row-ineligible {
+  opacity: 0.65;
+  background-color: #f8fafc;
 }
 
-.saas-table tr:last-child td {
-  border-bottom: none;
+/* Loading Overlay Animation */
+#analysis-loading-overlay {
+  transition: opacity 0.25s ease-in-out, visibility 0.25s ease-in-out;
+}
+.pulse-step {
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
 }
 
-.saas-table tr.row-recommended {
-  background: linear-gradient(90deg, rgba(239, 246, 255, 0.8) 0%, rgba(219, 234, 254, 0.3) 100%);
+/* Clean Form Elements */
+input[type="text"], input[type="number"], select {
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #0f172a;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
-.saas-table tr.row-ineligible {
-  color: var(--text-disabled);
-  background-color: #FAFAFA;
-}
-
-/* Spinner */
-.spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: #FFFFFF;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Document/Audit styling */
-.audit-doc-header {
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.audit-section {
-  padding: 1.25rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  margin-bottom: 1rem;
-}
-
-/* Scroll offset for sticky header compatibility */
-.scroll-mt-20 {
-  scroll-margin-top: 5rem;
-}
-
-/* Floating Back to Top Button */
-.btn-back-to-top {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 40;
-  transition: all 0.2s ease-in-out;
+input[type="text"]:focus, input[type="number"]:focus, select:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+  outline: none;
 }
