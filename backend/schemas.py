@@ -91,19 +91,28 @@ class ExplanationDriver(BaseModel):
     coefficient: float = Field(..., description="Ridge regression model coefficient")
     contribution_usd_per_tonne: float = Field(..., description="Additive linear contribution to delta (USD/tonne)")
     effect: Literal["positive", "negative", "neutral"] = Field(..., description="Direction of contribution")
-    source: Literal["model", "context"] = Field(default="model", description="Contribution origin")
+    source: Literal["model", "context", "market", "weather"] = Field(default="model", description="Contribution origin")
 
 
 class ExplanationAnchor(BaseModel):
-    """Mathematical decomposition of the residual prediction anchor."""
+    """Mathematical decomposition of the prediction anchor."""
 
     current_freight_usd_per_tonne: float = Field(..., description="Anchor spot freight rate (USD/tonne)")
     predicted_next_month_freight_usd_per_tonne: float = Field(..., description="Forecasted level rate (USD/tonne)")
-    raw_predicted_delta_usd_per_tonne: float = Field(..., description="Unbounded raw residual delta from Ridge pipeline")
-    bounded_delta_usd_per_tonne: float = Field(..., description="Residual delta after [-4.0, +4.0] guardrail")
+    raw_predicted_delta_usd_per_tonne: float = Field(..., description="Raw residual/time-series delta")
+    bounded_delta_usd_per_tonne: float = Field(..., description="Residual delta after guardrail/sanity checks")
     model_intercept: float = Field(..., description="Global baseline intercept term")
-    residual_guardrail_applied: bool = Field(..., description="Whether [-4.0, +4.0] clipping was triggered")
+    residual_guardrail_applied: bool = Field(..., description="Whether clipping/sanity boundary was triggered")
     physical_floor_applied: bool = Field(..., description="Whether >= 1.0 USD/tonne floor was triggered")
+    predicted_freight_usd_per_tonne: Optional[float] = Field(default=None, description="Forecasted level rate (USD/tonne)")
+    forecast_change_usd_per_tonne: Optional[float] = Field(default=None, description="Forecast change in USD/tonne")
+    forecast_change_percent: Optional[float] = Field(default=None, description="Forecast change in percent")
+    direction: Optional[str] = Field(default=None, description="Forecast direction (UP/DOWN/STABLE)")
+    route_matched: Optional[str] = Field(default=None, description="Canonical route matched")
+    canonical_order: Optional[list[int]] = Field(default=None, description="ARIMA (p, d, q) order")
+    canonical_seasonal_order: Optional[list[int]] = Field(default=None, description="SARIMA seasonal order")
+
+    model_config = {"extra": "allow"}
 
 
 class PredictionExplanation(BaseModel):
@@ -133,6 +142,27 @@ class FreightResponse(BaseModel):
         ..., description="Actionable chartering recommendation"
     )
     reason: str = Field(..., description="Human-readable explanation of the recommendation")
+    predicted_freight_usd_per_tonne: Optional[float] = Field(
+        default=None, description="Model forecast for next-month freight rate (USD/tonne)"
+    )
+    forecast_change_usd_per_tonne: Optional[float] = Field(
+        default=None, description="Forecast delta in USD/tonne"
+    )
+    direction: Optional[Literal["UP", "DOWN", "STABLE"]] = Field(
+        default=None, description="Forecast movement direction"
+    )
+    model_name: Optional[str] = Field(
+        default=None, description="Active model identifier"
+    )
+    model_version: Optional[str] = Field(
+        default=None, description="Active model semantic version"
+    )
+    training_data_end_date: Optional[str] = Field(
+        default=None, description="End date of historical training observations"
+    )
+    forecast_timestamp: Optional[str] = Field(
+        default=None, description="Timestamp of forecast generation"
+    )
     sources: dict[str, str] = Field(
         default_factory=dict,
         description="Provenance of each model input: 'user' or a DB reference with freshness info.",
@@ -141,6 +171,8 @@ class FreightResponse(BaseModel):
         default=None,
         description="Transparent mathematical breakdown and natural language drivers of the prediction.",
     )
+
+    model_config = {"extra": "allow"}
 
 
 # --------------------------------------------------------------------------- #
@@ -570,18 +602,21 @@ class ValidationEvidence(BaseModel):
 
 
 class ModelOverviewSection(BaseModel):
-    """Production Model v3 metadata and architectural specifications."""
+    """Production Model metadata and architectural specifications."""
 
     model_name: str
     version: str
     algorithm: str
-    alpha: float
+    alpha: Optional[float] = None
+    order: Optional[list[int]] = None
+    seasonal_order: Optional[list[int]] = None
     features_count: int
     excludes_cargo_tonnes: bool
     synthetic_data_used: bool
     residual_guardrail_usd_per_tonne: list[float]
     physical_floor_usd_per_tonne: float
     validation_evidence: ValidationEvidence
+    model_config = {"extra": "allow"}
 
 
 class DashboardProvenance(BaseModel):

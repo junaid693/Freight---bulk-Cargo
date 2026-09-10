@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,7 +9,9 @@
   <!-- Google Fonts: Geist & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
 
   <!-- Tailwind CSS Runtime with Forms Plugin -->
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
@@ -38,45 +41,53 @@
 
   <link rel="stylesheet" href="/static/css/styles.css?v=3.1" />
 </head>
+
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col font-sans">
 
   <!-- Top Enterprise Header -->
   <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
-        
+
         <!-- Brand & Product Title -->
         <div class="flex items-center space-x-3">
-          <div class="w-9 h-9 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+          <div
+            class="w-9 h-9 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
             NF
           </div>
           <div>
             <div class="flex items-center space-x-2">
               <span class="font-bold text-gray-900 tracking-tight text-lg">NaviFreight</span>
-              <span class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-gray-100 text-gray-600 rounded">MVP</span>
+              <span
+                class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-gray-100 text-gray-600 rounded">MVP</span>
             </div>
-            <p class="text-xs text-gray-500 hidden sm:block">Bulk Freight & Cargo Decision Support · East Coast India</p>
+            <p class="text-xs text-gray-500 hidden sm:block">Bulk Freight & Cargo Decision Support · East Coast India
+            </p>
           </div>
         </div>
 
         <!-- Navigation Tabs (Exactly Two) -->
-        <nav class="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200" aria-label="Main Navigation">
+        <nav class="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200"
+          aria-label="Main Navigation">
           <button id="tab-cargo" type="button" class="tab-btn active" data-target="view-cargo-decision">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>Cargo Decision</span>
           </button>
           <button id="tab-audit" type="button" class="tab-btn" data-target="view-audit-evidence">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
             <span>Audit & Evidence</span>
           </button>
         </nav>
 
         <!-- System Status -->
-        <div class="hidden md:flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full">
+        <div
+          class="hidden md:flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span class="font-medium">Model v3</span>
           <span class="text-gray-300">|</span>
@@ -108,7 +119,8 @@
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-700 flex items-center gap-2">
             <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
             Shipment Details
           </h2>
@@ -116,7 +128,7 @@
         </div>
 
         <form id="form-shipment" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end" novalidate>
-          
+
           <!-- Commodity -->
           <div>
             <label for="input-commodity" class="block text-xs font-medium text-gray-700 mb-1">Commodity</label>
@@ -152,18 +164,10 @@
 
           <!-- Cargo Volume -->
           <div>
-            <label for="input-cargo-tonnes" class="block text-xs font-medium text-gray-700 mb-1">Cargo Volume (tonnes)</label>
-            <input
-              id="input-cargo-tonnes"
-              type="text"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              value="150000"
-              class="form-input font-mono text-sm"
-              placeholder="e.g. 46038"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            <label for="input-cargo-tonnes" class="block text-xs font-medium text-gray-700 mb-1">Cargo Volume
+              (tonnes)</label>
+            <input id="input-cargo-tonnes" type="text" inputmode="numeric" pattern="[0-9]*" value="150000"
+              class="form-input font-mono text-sm" placeholder="e.g. 46038" autocomplete="off" spellcheck="false" />
           </div>
 
           <!-- Submit Action -->
@@ -180,7 +184,9 @@
       <div id="decision-error" class="hidden p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
         <div class="flex items-center gap-2">
           <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            <path fill-rule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clip-rule="evenodd" />
           </svg>
           <span id="decision-error-message" class="font-medium">Error analyzing shipment.</span>
         </div>
@@ -196,7 +202,8 @@
         </div>
 
         <!-- Two Separate Decisions (Feasible) -->
-        <div id="recommendation-two-decisions" class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 border-b border-gray-100">
+        <div id="recommendation-two-decisions"
+          class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 border-b border-gray-100">
           <!-- Cargo Decision -->
           <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
             <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 block mb-1">CARGO DECISION</span>
@@ -207,7 +214,8 @@
 
           <!-- Freight Decision -->
           <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 block mb-1">FREIGHT DECISION</span>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 block mb-1">FREIGHT
+              DECISION</span>
             <div id="rec-freight-decision" class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
               CHARTER NOW
             </div>
@@ -230,14 +238,15 @@
         <!-- Short Explanation Underneath -->
         <div class="pt-3">
           <p id="strategy-explanation" class="text-gray-700 text-sm leading-relaxed max-w-3xl font-medium">
-            Cargo prices are high, but freight rates are expected to rise. Wait to buy the cargo, but charter the vessel now.
+            Cargo prices are high, but freight rates are expected to rise. Wait to buy the cargo, but charter the vessel
+            now.
           </p>
         </div>
       </div>
 
       <!-- 3. Decision Summary (Cargo / Freight / Vessel) -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
+
         <!-- Cargo Card -->
         <div class="saas-card p-5 bg-white flex flex-col justify-between">
           <div class="flex items-center justify-between mb-3">
@@ -252,8 +261,10 @@
             </div>
           </div>
           <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-            <span>Price vs. History: <strong id="summary-cargo-percentile" class="text-gray-900">High (94%)</strong></span>
-            <span>Price Change (3 months): <strong id="summary-cargo-momentum" class="text-gray-900 font-mono">-1.2%</strong></span>
+            <span>Price vs. History: <strong id="summary-cargo-percentile" class="text-gray-900">High
+                (94%)</strong></span>
+            <span>Price Change (3 months): <strong id="summary-cargo-momentum"
+                class="text-gray-900 font-mono">-1.2%</strong></span>
           </div>
         </div>
 
@@ -270,8 +281,10 @@
               <span id="summary-freight-unit" class="text-xs text-gray-500 font-mono">USD/t</span>
             </div>
           </div>
-          <div id="summary-freight-timing-container" class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-            <span>Freight Decision: <strong id="summary-freight-timing" class="text-gray-900 font-semibold">CHARTER NOW</strong></span>
+          <div id="summary-freight-timing-container"
+            class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+            <span>Freight Decision: <strong id="summary-freight-timing" class="text-gray-900 font-semibold">CHARTER
+                NOW</strong></span>
           </div>
         </div>
 
@@ -289,7 +302,8 @@
             </div>
           </div>
           <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-            <span>Estimated Freight Cost: <strong id="summary-vessel-outlay" class="text-gray-900 font-mono">$2,563,500</strong></span>
+            <span>Estimated Freight Cost: <strong id="summary-vessel-outlay"
+                class="text-gray-900 font-mono">$2,563,500</strong></span>
             <span>Vessel Fit: <strong id="summary-vessel-score" class="text-brand-700">Best fit</strong></span>
           </div>
         </div>
@@ -300,7 +314,8 @@
       <div class="saas-card p-5 bg-white">
         <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700 mb-3 flex items-center gap-2">
           <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           Why?
         </h3>
@@ -318,7 +333,8 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
             <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Estimated Landed Cost</h3>
-            <p class="text-xs text-gray-500">Delivered commodity cost combining current cargo price and ocean freight</p>
+            <p class="text-xs text-gray-500">Delivered commodity cost combining current cargo price and ocean freight
+            </p>
           </div>
           <div class="text-xs text-gray-500 font-mono">
             <span class="font-semibold text-gray-700">Current Cargo Price + Ocean Freight = Estimated Landed Cost</span>
@@ -327,7 +343,7 @@
 
         <!-- Formula Math Cards -->
         <div class="grid grid-cols-1 md:grid-cols-7 gap-3 items-center text-center my-2">
-          
+
           <!-- Box 1: Cargo Price -->
           <div class="md:col-span-2 p-3.5 rounded-lg bg-gray-50 border border-gray-200">
             <div class="text-xs text-gray-500 font-medium mb-1">Current Cargo Price</div>
@@ -358,7 +374,8 @@
         </div>
 
         <!-- Outlay Summary -->
-        <div class="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div
+          class="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div class="text-gray-600">
             Estimated Total Outlay (<span id="lc-tonnes-summary" class="font-mono">150,000 mt</span>):
             <strong id="lc-total-outlay" class="text-gray-900 font-mono text-sm ml-1">$22,843,500.00 USD</strong>
@@ -483,25 +500,26 @@
           </h3>
           <span class="badge badge-success text-xs">VERIFIED</span>
         </div>
-        
+
         <div class="space-y-3 text-xs">
           <div class="p-3 bg-gray-50 rounded border border-gray-200 font-mono">
-            <div class="text-gray-500 text-[11px] mb-1">Model File Checksum (<code class="text-gray-700">freight_forecast_model_v3.joblib</code>):</div>
+            <div class="text-gray-500 text-[11px] mb-1">Model File Checksum (<code
+                class="text-gray-700">freight_forecast_model_timeseries.joblib</code>):</div>
             <div class="text-gray-900 font-bold select-all break-all code-badge bg-white p-1.5 border border-gray-300">
-              71fbb870bb1f555d73a51ed7d83fb5a877cc4405ce54d1fe18407c9ce37c46a8
+              203a614041c7693b201ac4cf6f5467a38067fd0dcea4a7b585acdd1602ba4efa
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="p-3 bg-gray-50 rounded border border-gray-200">
+              <span class="text-gray-500 block mb-1">Model Architecture</span>
+              <strong class="text-gray-900">Route-Specific ARIMA(0,1,1) Time-Series</strong>
+              <span class="text-[11px] text-gray-500 block mt-0.5">Walk-Forward MAE: $1.11/t (92.0% Dir Acc)</span>
+            </div>
+            <div class="p-3 bg-gray-50 rounded border border-gray-200">
               <span class="text-gray-500 block mb-1">Training Dataset</span>
               <strong class="text-gray-900">110 Genuine Monthly Observations</strong>
               <span class="text-[11px] text-gray-500 block mt-0.5">Feb 2024 – Nov 2025 across 5 canonical routes</span>
-            </div>
-            <div class="p-3 bg-gray-50 rounded border border-gray-200">
-              <span class="text-gray-500 block mb-1">Synthetic Data</span>
-              <strong class="text-emerald-700">Zero Synthetic Records Used</strong>
-              <span class="text-[11px] text-gray-500 block mt-0.5">Quarantined from production</span>
             </div>
           </div>
         </div>
@@ -580,12 +598,18 @@
         </h3>
         <div class="p-3 bg-gray-50 rounded border border-gray-200">
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs text-gray-700">
-            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Dhamra:</span> <strong class="text-gray-900">18.0 m</strong></div>
-            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Gangavaram:</span> <strong class="text-gray-900">18.5 m</strong></div>
-            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Visakhapatnam:</span> <strong class="text-gray-900">18.1 m</strong></div>
-            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Krishnapatnam:</span> <strong class="text-gray-900">18.0 m</strong></div>
-            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Paradip:</span> <strong class="text-gray-900">14.5 m</strong></div>
-            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Haldia:</span> <strong class="text-gray-900">8.0 m</strong></div>
+            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Dhamra:</span> <strong
+                class="text-gray-900">18.0 m</strong></div>
+            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Gangavaram:</span> <strong
+                class="text-gray-900">18.5 m</strong></div>
+            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Visakhapatnam:</span> <strong
+                class="text-gray-900">18.1 m</strong></div>
+            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Krishnapatnam:</span> <strong
+                class="text-gray-900">18.0 m</strong></div>
+            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Paradip:</span> <strong
+                class="text-gray-900">14.5 m</strong></div>
+            <div class="flex justify-between border-b border-gray-200 pb-1"><span>Haldia:</span> <strong
+                class="text-gray-900">8.0 m</strong></div>
           </div>
         </div>
       </div>
@@ -596,9 +620,11 @@
 
   <!-- Clean Enterprise Footer -->
   <footer class="bg-white border-t border-gray-200 py-4 mt-auto">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
+    <div
+      class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
       <div>
-        <span class="font-semibold text-gray-700">NaviFreight</span> — Intelligent Bulk Freight Forecasting & Procurement Optimization
+        <span class="font-semibold text-gray-700">NaviFreight</span> — Intelligent Bulk Freight Forecasting &
+        Procurement Optimization
       </div>
       <div class="flex items-center space-x-4 font-mono text-[11px]">
         <span>Model: <code class="text-gray-700">Model v3</code></span>
@@ -617,10 +643,14 @@
       <div class="analysis-card-content">
         <svg class="analysis-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+          </path>
         </svg>
         <div class="analysis-sentence-box">
-          <span id="analysis-sentence-text" class="analysis-sentence-text">Analyzing freight rates</span><span class="animated-dots" aria-hidden="true"><span class="dot dot-1">.</span><span class="dot dot-2">.</span><span class="dot dot-3">.</span></span>
+          <span id="analysis-sentence-text" class="analysis-sentence-text">Analyzing freight rates</span><span
+            class="animated-dots" aria-hidden="true"><span class="dot dot-1">.</span><span
+              class="dot dot-2">.</span><span class="dot dot-3">.</span></span>
         </div>
       </div>
     </div>
@@ -629,4 +659,5 @@
   <!-- Application Logic Modules -->
   <script type="module" src="/static/js/app.js?v=3.1"></script>
 </body>
+
 </html>

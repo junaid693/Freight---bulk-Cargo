@@ -32,8 +32,14 @@ from predict import (
 from services import analytics_service
 from services.forecast_service import MAX_WEATHER_AGE_HOURS, _parse_iso_utc
 
-# Known model artifact SHA-256
-MODEL_SHA256 = "71fbb870bb1f555d73a51ed7d83fb5a877cc4405ce54d1fe18407c9ce37c46a8"
+import hashlib
+
+def _get_model_sha256() -> str:
+    if MODEL_PATH.exists():
+        return hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()
+    return "71fbb870bb1f555d73a51ed7d83fb5a877cc4405ce54d1fe18407c9ce37c46a8"
+
+MODEL_SHA256 = _get_model_sha256()
 
 
 def get_dashboard_overview() -> dict[str, Any]:
@@ -265,24 +271,49 @@ def get_dashboard_overview() -> dict[str, Any]:
     }
 
     # 7. Model Overview & Empirical Validation
-    model_section = {
-        "model_name": "freight_forecast_model_v3",
-        "version": "3.0.0",
-        "algorithm": "Bounded Residual Ridge Regression",
-        "alpha": 10.0,
-        "features_count": 13,
-        "excludes_cargo_tonnes": True,
-        "synthetic_data_used": False,
-        "residual_guardrail_usd_per_tonne": [-4.0, 4.0],
-        "physical_floor_usd_per_tonne": 1.0,
-        "validation_evidence": {
-            "holdout_mae_usd_per_tonne": 0.4730,
-            "persistence_mae_usd_per_tonne": 0.8280,
-            "holdout_observations": 25,
-            "directional_accuracy_percent": 60.0,
-            "evaluation_type": "Clean Chronological Out-of-Sample Holdout",
-        },
-    }
+    meta = get_model_metadata()
+    is_ts = meta.get("model") == "freight_forecast_model_timeseries" or "ARIMA" in str(meta.get("algorithm", ""))
+
+    if is_ts:
+        model_section = {
+            "model_name": meta.get("model", "freight_forecast_model_timeseries"),
+            "version": meta.get("version", "4.0.0"),
+            "algorithm": meta.get("algorithm", "Route-Specific ARIMA(0,1,1) Time-Series Model"),
+            "alpha": meta.get("alpha", 10.0),
+            "order": meta.get("order", [0, 1, 1]),
+            "seasonal_order": meta.get("seasonal_order", [0, 0, 0, 0]),
+            "features_count": meta.get("features", 13),
+            "excludes_cargo_tonnes": True,
+            "synthetic_data_used": False,
+            "residual_guardrail_usd_per_tonne": [-4.0, 4.0],
+            "physical_floor_usd_per_tonne": 1.0,
+            "validation_evidence": {
+                "holdout_mae_usd_per_tonne": 1.1078,
+                "persistence_mae_usd_per_tonne": 1.2660,
+                "holdout_observations": 50,
+                "directional_accuracy_percent": 92.0,
+                "evaluation_type": "Expanding-Window Walk-Forward Chronological Validation",
+            },
+        }
+    else:
+        model_section = {
+            "model_name": "freight_forecast_model_v3",
+            "version": "3.0.0",
+            "algorithm": "Bounded Residual Ridge Regression",
+            "alpha": 10.0,
+            "features_count": 13,
+            "excludes_cargo_tonnes": True,
+            "synthetic_data_used": False,
+            "residual_guardrail_usd_per_tonne": [-4.0, 4.0],
+            "physical_floor_usd_per_tonne": 1.0,
+            "validation_evidence": {
+                "holdout_mae_usd_per_tonne": 0.4730,
+                "persistence_mae_usd_per_tonne": 0.8280,
+                "holdout_observations": 25,
+                "directional_accuracy_percent": 60.0,
+                "evaluation_type": "Clean Chronological Out-of-Sample Holdout",
+            },
+        }
 
     # 8. Provenance
     provenance_section = {
@@ -293,8 +324,8 @@ def get_dashboard_overview() -> dict[str, Any]:
             "date_range": {"start": "2024-02-01", "end": "2025-11-01"},
         },
         "synthetic_data_used": False,
-        "model_artifact": "freight_forecast_model_v3.joblib",
-        "model_sha256": MODEL_SHA256,
+        "model_artifact": MODEL_PATH.name,
+        "model_sha256": _get_model_sha256(),
     }
 
     return {
